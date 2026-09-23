@@ -22,3 +22,13 @@ TASK.md
 xample_fast.html
 probe*.json
 .workbuddy-ai/
+
+# A pasted answer about running OpenRouter through a proxy - working notes, not
+# project material.
+rout.txt
+
+# A reference design page kept in the working directory while the second skin
+# was being built. It is somebody else's single-file page with its own .git, so
+# it must never be tracked here: committing it would either drag a nested
+# repository into the tree or copy the whole thing into this one.
+web_portfolio_27B_test/
