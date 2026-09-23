@@ -1,7 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
 import { assertConfig, config } from './config.js';
-import { AppError } from './lib/errors.js';
+import { AppError, redactSecrets } from './lib/errors.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { chatRouter } from './routes/chat.js';
 import { modelsRouter } from './routes/models.js';
@@ -55,7 +55,12 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     return;
   }
 
-  const message = error instanceof Error ? error.message : 'Unexpected error.';
+  // An AppError redacts at construction; this is the net for everything else
+  // that can reach the handler, including errors thrown by middleware and by
+  // the HTTP layer, whose text nobody here wrote.
+  const message = redactSecrets(
+    error instanceof Error ? error.message : 'Unexpected error.',
+  );
   console.error('[api] unhandled error:', message);
   res.status(500).json({ error: { code: 'UNKNOWN', message } });
 });

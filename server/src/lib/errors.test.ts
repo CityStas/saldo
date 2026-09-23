@@ -5,6 +5,7 @@ import {
   isAbortError,
   isKeyScoped,
   isRetryable,
+  redactSecrets,
 } from './errors.js';
 
 /** OpenRouter's own error shape: a JSON envelope with a message inside. */
@@ -107,5 +108,37 @@ describe('isAbortError', () => {
 describe('AppError', () => {
   it('defaults to status 500', () => {
     expect(new AppError('UNKNOWN', 'boom').status).toBe(500);
+  });
+});
+
+/**
+ * A key is the one string that must never reach the browser, and the messages
+ * built from upstream bodies are the only place somebody else's text enters the
+ * response. The requirement is checked with the Network tab, so a key sitting in
+ * a response body would be as visible as one in a request header.
+ */
+describe('redactSecrets', () => {
+  const KEY =
+    'sk-or-v1-fixture-not-a-real-key';
+
+  it('removes a key an upstream body happened to contain', () => {
+    const error = fromUpstreamStatus(
+      403,
+      JSON.stringify({ success: false, error: `Access denied for ${KEY}.` }),
+    );
+
+    expect(error.code).toBe('UPSTREAM_BLOCKED');
+    expect(error.message).not.toContain('sk-or-v1-');
+    expect(error.message).toContain('[redacted]');
+  });
+
+  it('cleans a hand-built error too, not only upstream ones', () => {
+    expect(new AppError('AUTH', `Rejected ${KEY}`).message).toBe(
+      'Rejected [redacted]',
+    );
+  });
+
+  it('leaves ordinary words that merely start with sk- alone', () => {
+    expect(redactSecrets('a task-force decision')).toBe('a task-force decision');
   });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isFreeTextModel, type OpenRouterModel } from './openrouter.js';
+import {
+  isFreeTextModel,
+  readChatStream,
+  type ChatDelta,
+  type OpenRouterModel,
+} from './openrouter.js';
 
 function model(overrides: Partial<OpenRouterModel>): OpenRouterModel {
   return {
@@ -60,5 +65,44 @@ describe('isFreeTextModel', () => {
         model({ architecture: { output_modalities: ['text', 'image'] } }),
       ),
     ).toBe(false);
+  });
+});
+
+async function collect(frames: string[]): Promise<ChatDelta[]> {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames) {
+        controller.enqueue(new TextEncoder().encode(frame));
+      }
+      controller.close();
+    },
+  });
+
+  const deltas: ChatDelta[] = [];
+  for await (const delta of readChatStream(body)) deltas.push(delta);
+  return deltas;
+}
+
+describe('readChatStream', () => {
+  it('redacts a key that an upstream stream error happened to contain', async () => {
+    // OpenRouter can report a failure after HTTP 200. This text does not become
+    // an AppError - it is forwarded to the browser as a delta - so it has to be
+    // cleaned on its own, or the Network tab shows the key in the SSE body.
+    const key =
+      'sk-or-v1-fixture-not-a-real-key';
+    const frame = `data: ${JSON.stringify({ error: { message: `Bad key ${key}` } })}\n\n`;
+
+    const error = (await collect([frame])).find((d) => d.error)?.error ?? '';
+
+    expect(error).not.toContain('sk-or-v1-');
+    expect(error).toContain('[redacted]');
+  });
+
+  it('passes content through untouched', async () => {
+    const frame = `data: ${JSON.stringify({
+      choices: [{ delta: { content: 'НДС' }, finish_reason: null }],
+    })}\n\n`;
+
+    expect((await collect([frame]))[0]?.text).toBe('НДС');
   });
 });

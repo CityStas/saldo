@@ -2,7 +2,7 @@ import net from 'node:net';
 import { ProxyAgent, type Dispatcher } from 'undici';
 import { config, isProxyConfigured } from '../config.js';
 import { SseDecoder } from '../lib/sse.js';
-import { AppError, fromUpstreamStatus } from '../lib/errors.js';
+import { AppError, fromUpstreamStatus, redactSecrets } from '../lib/errors.js';
 import type { ChatMessage, ModelStatus } from '../types/chat.js';
 
 /**
@@ -383,7 +383,11 @@ export async function* readChatStream(
     }
 
     if (chunk.error) {
-      return { error: chunk.error.message ?? 'Upstream stream error.' };
+      // This text does not become an AppError - it travels as a delta and is
+      // sent to the browser as-is, so it needs the same treatment here.
+      return {
+        error: redactSecrets(chunk.error.message ?? 'Upstream stream error.'),
+      };
     }
 
     const choice = chunk.choices?.[0];

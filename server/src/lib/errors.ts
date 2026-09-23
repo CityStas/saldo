@@ -3,6 +3,26 @@ import type { ChatErrorCode } from '../types/chat.js';
 export type ErrorScope = 'global' | 'model';
 
 /**
+ * Anything that looks like an API key, out of text on its way to a client.
+ *
+ * Upstream error bodies are quoted back to the browser so that a failure
+ * explains itself, and those bodies are written by somebody else. OpenRouter
+ * does not echo the Authorization header today, but "today" is not a guarantee,
+ * and the one place the key must never be readable is the browser: the
+ * requirement is checked with the Network tab, where a key inside a response
+ * body is exactly as visible as one inside a request header.
+ *
+ * The tail is long on purpose. A real key is 73 characters, so twelve word
+ * characters after `sk-` cannot be a coincidence, while a word like `task-force`
+ * is left alone.
+ */
+const KEY_LIKE = /sk-[A-Za-z0-9_-]{12,}/g;
+
+export function redactSecrets(text: string): string {
+  return text.replace(KEY_LIKE, '[redacted]');
+}
+
+/**
  * Single error type crossing the API boundary. `code` is what the client
  * switches on; `message` is a short technical string meant for logs, not for
  * the end user (the UI owns its own copy).
@@ -21,7 +41,10 @@ export class AppError extends Error {
     status = 500,
     options: { scope?: ErrorScope; retryAfterMs?: number } = {},
   ) {
-    super(message);
+    // Redacted at construction rather than at the response boundary, so the
+    // message is clean everywhere it travels: the JSON error body, the SSE
+    // event, the registry's stored `lastError`, and the server log.
+    super(redactSecrets(message));
     this.name = 'AppError';
     this.code = code;
     this.status = status;
