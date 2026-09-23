@@ -33,8 +33,10 @@ describe('withSystemPrompt', () => {
   });
 
   it('uses hyphens only, like the rest of the project', () => {
-    // The brief asks for no em dashes anywhere in the product, the persona
-    // included - and it has to ask the model for the same.
+    // The persona answers in the voice of САЛЬДО's own copy, and that copy is
+    // written with hyphens. An em dash in an answer would be the one place the
+    // chat visibly stops matching the service it belongs to, so the prompt has
+    // to ask the model for the same and this test pins the instruction.
     expect(SYSTEM_PROMPT).not.toMatch(/[\u2013\u2014]/);
     expect(SYSTEM_PROMPT).toContain('Длинное тире не используй');
   });
