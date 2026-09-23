@@ -37,15 +37,6 @@ export type ChatErrorCode =
   | 'CANCELLED'
   | 'UNKNOWN';
 
-export interface ApiErrorBody {
-  error: {
-    code: ChatErrorCode;
-    message: string;
-    /** Present for RATE_LIMIT: how long to wait before retrying, in ms. */
-    retryAfterMs?: number;
-  };
-}
-
 export type ModelStatus = 'unknown' | 'working' | 'rate_limited' | 'error';
 
 export interface ModelInfo {
@@ -62,12 +53,6 @@ export interface ModelInfo {
   latencyMs: number | null;
   okCount: number;
   failCount: number;
-}
-
-export interface ModelsResponse {
-  models: ModelInfo[];
-  refreshedAt: number;
-  source: 'openrouter';
 }
 
 /** Server -> client events, framed as SSE. */

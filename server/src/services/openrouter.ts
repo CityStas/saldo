@@ -1,11 +1,26 @@
 import net from 'node:net';
 import { ProxyAgent, type Dispatcher } from 'undici';
-import { config } from '../config.js';
+import { config, isProxyConfigured } from '../config.js';
 import { SseDecoder } from '../lib/sse.js';
 import { AppError, fromUpstreamStatus } from '../lib/errors.js';
 import type { ChatMessage, ModelStatus } from '../types/chat.js';
 
-const BASE_URL = 'https://openrouter.ai/api/v1';
+/**
+ * Where OpenRouter is reached from. Normally openrouter.ai; through a relay
+ * (see `worker/`) when `OPENROUTER_BASE_URL` points somewhere else, which is how
+ * the app works on a network that cannot reach OpenRouter directly.
+ */
+const BASE_URL = config.openrouterBaseUrl;
+
+/**
+ * The relay's shared secret. Must match the Worker's `RELAY_TOKEN`.
+ *
+ * Declared on both sides on purpose: they are two runtimes with no module in
+ * common, and a header name that differs by one character produces a 403 that
+ * looks like a broken relay.
+ */
+const RELAY_TOKEN_HEADER = 'X-Relay-Token';
+
 const APP_TITLE = 'Saldo Chat';
 const APP_URL = 'https://github.com/CityStas/saldo';
 
@@ -65,21 +80,43 @@ export async function checkProxy(): Promise<boolean> {
   return reachable;
 }
 
-/** True when a proxy is configured AND was reachable at the last check. */
+/**
+ * True when a proxy is configured, was reachable at the last check, and is
+ * actually the route in use - a relay replaces it, see `isProxyConfigured`.
+ */
 export function isProxyInUse(): boolean {
-  return config.outboundProxy !== '' && proxyUsable !== false;
+  return isProxyConfigured() && proxyUsable !== false;
 }
 
 /**
  * Optional outbound proxy. On networks where Cloudflare rejects non-browser
  * TLS fingerprints (or where the API host is unreachable) the whole backend is
  * dead without this, so it is a first-class config knob rather than a hack.
+ *
+ * It applies only when OpenRouter is the target. With a relay configured the
+ * request goes to the relay, and routing that through the proxy breaks it: the
+ * proxy cannot resolve a host on this machine.
  */
 function dispatcher(): Dispatcher | undefined {
-  if (!config.outboundProxy) return undefined;
+  if (!isProxyConfigured()) return undefined;
   if (proxyUsable === false) return undefined;
   cachedDispatcher ??= new ProxyAgent(config.outboundProxy);
   return cachedDispatcher;
+}
+
+/**
+ * Adds the relay's shared secret to whatever headers the call already has.
+ *
+ * Done here rather than in `headers()` so that every upstream call carries it -
+ * including the two GETs that build their own headers - and so there is a single
+ * place to look when the relay starts answering 403.
+ */
+function withRelayToken(headers: HeadersInit | undefined): HeadersInit | undefined {
+  if (!config.relayToken) return headers;
+
+  const merged = new Headers(headers);
+  merged.set(RELAY_TOKEN_HEADER, config.relayToken);
+  return merged;
 }
 
 export function upstreamFetch(
@@ -87,8 +124,11 @@ export function upstreamFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const agent = dispatcher();
-  if (!agent) return fetch(url, init);
-  return fetch(url, { ...init, dispatcher: agent } as RequestInit);
+  const headers = withRelayToken(init.headers);
+  const request: RequestInit = headers === init.headers ? init : { ...init, headers };
+
+  if (!agent) return fetch(url, request);
+  return fetch(url, { ...request, dispatcher: agent } as RequestInit);
 }
 
 /**

@@ -1,12 +1,13 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
-import { assertConfig, config, isProxyConfigured } from './config.js';
+import { assertConfig, config } from './config.js';
 import { AppError } from './lib/errors.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { chatRouter } from './routes/chat.js';
 import { modelsRouter } from './routes/models.js';
-import { checkProxy, isProxyInUse } from './services/openrouter.js';
-import { ensureDiscovered, probeAll, snapshot } from './services/registry.js';
+import { isProxyInUse } from './services/openrouter.js';
+import { snapshot } from './services/registry.js';
+import { reportOutboundRoute, warmRegistry } from './startup.js';
 
 assertConfig();
 
@@ -28,6 +29,8 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     proxy: isProxyInUse(),
+    /** Where upstream calls actually go. The relay's host when one is set. */
+    upstream: config.openrouterBaseUrl,
     models: models.length,
     working: models.filter((model) => model.status === 'working').length,
     refreshedAt,
@@ -60,48 +63,11 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 const server = app.listen(config.port, async () => {
   console.log(`[api] listening on http://localhost:${config.port}`);
 
-  // A stale `OUTBOUND_PROXY` (VPN client not running) used to make every
-  // request fail on a machine that could reach OpenRouter directly. Check once,
-  // at startup, and fall back to the direct route if the port is dead.
-  if (isProxyConfigured()) {
-    const reachable = await checkProxy();
-    console.log(
-      reachable
-        ? `[api] outbound proxy: ${config.outboundProxy}`
-        : `[api] outbound proxy ${config.outboundProxy} is not reachable - using a direct connection`,
-    );
-  } else {
-    console.log('[api] outbound proxy: direct');
-  }
+  await reportOutboundRoute();
 
-  // Warm the model registry in the background: the first user request should
-  // not pay for catalog discovery.
-  void ensureDiscovered()
-    .then(() => {
-      const { models } = snapshot();
-      console.log(`[api] ${models.length} free models discovered`);
-
-      if (config.probeLimit <= 0) {
-        console.log('[api] background probing disabled (PROBE_LIMIT=0)');
-        return;
-      }
-
-      console.log(
-        `[api] probing up to ${config.probeLimit} models, ${config.probeConcurrency} at a time...`,
-      );
-      return probeAll().then(() => {
-        const working = snapshot().models.filter(
-          (model) => model.status === 'working',
-        ).length;
-        console.log(`[api] probes done: ${working} working`);
-      });
-    })
-    .catch((error: unknown) => {
-      console.error(
-        '[api] model discovery failed:',
-        error instanceof Error ? error.message : error,
-      );
-    });
+  // Deliberately not awaited: the port is open and the server can answer while
+  // the catalog is still being filled in.
+  void warmRegistry();
 });
 
 function shutdown(signal: string): void {

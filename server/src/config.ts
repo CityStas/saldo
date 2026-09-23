@@ -56,6 +56,14 @@ const keyList = list('OPENROUTER_API_KEYS');
 const singleKey = str('OPENROUTER_API_KEY');
 const apiKeys = keyList.length > 0 ? keyList : singleKey ? [singleKey] : [];
 
+/** OpenRouter's own address. Anything else means a relay is in front of it. */
+export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+const openrouterBaseUrl = str('OPENROUTER_BASE_URL', DEFAULT_OPENROUTER_BASE_URL).replace(
+  /\/+$/,
+  '',
+);
+
 export const config = {
   port: num('PORT', 3001),
   /** First key. Kept for callers that only need "is a key configured". */
@@ -69,6 +77,27 @@ export const config = {
   /** Model ids that are never used. */
   modelBlocklist: list('OPENROUTER_MODEL_BLOCKLIST'),
   outboundProxy: proxyFromEnv,
+  /**
+   * Where OpenRouter is reached from.
+   *
+   * Left alone this is openrouter.ai itself. Pointed at a relay - the Cloudflare
+   * Worker in `worker/`, a Deno Deploy script, a VPS with nginx - every upstream
+   * call goes through it instead. The relay is a plain reverse proxy: it does not
+   * know the API key and does not need to, which is why the whole BFF stays here
+   * rather than being reimplemented on the edge.
+   *
+   * The trailing slash is stripped so `${base}/chat/completions` cannot come out
+   * as `//chat/completions`, which some proxies treat as a different path.
+   */
+  openrouterBaseUrl,
+  /**
+   * Shared secret the relay checks before forwarding anything.
+   *
+   * A relay without one is an open proxy to OpenRouter: whoever finds the URL
+   * spends the keys behind it. Empty means "no relay configured" and no header
+   * is sent, so a direct connection keeps working exactly as before.
+   */
+  relayToken: str('OPENROUTER_RELAY_TOKEN'),
   upstreamTimeoutMs: num('UPSTREAM_TIMEOUT_MS', 60_000),
   /**
    * How long to wait for the first content token before giving up on a model
@@ -114,6 +143,16 @@ export const config = {
   proxyCheckTimeoutMs: num('PROXY_CHECK_TIMEOUT_MS', 1_500),
   /** How long a discovered model list stays fresh. */
   registryTtlMs: num('REGISTRY_TTL_MS', 10 * 60_000),
+  /**
+   * Hard ceiling on one model-discovery round.
+   *
+   * Discovery is shared between callers through a single in-flight promise, so
+   * one round that never settles takes the registry with it. This is the
+   * backstop that guarantees the promise always settles: generous next to the
+   * per-request timeout above, because a slow catalog read is fine and a
+   * permanently stuck one is not.
+   */
+  discoveryDeadlineMs: num('DISCOVERY_DEADLINE_MS', 20_000),
   /** Cooldown after a model returns 429/5xx. */
   modelCooldownMs: num('MODEL_COOLDOWN_MS', 60_000),
   maxMessages: num('MAX_MESSAGES', 60),
@@ -131,4 +170,22 @@ export function assertConfig(): void {
   }
 }
 
-export const isProxyConfigured = (): boolean => config.outboundProxy !== '';
+/** True when upstream calls go through a relay instead of straight to OpenRouter. */
+export const isRelayConfigured = (): boolean =>
+  config.openrouterBaseUrl !== DEFAULT_OPENROUTER_BASE_URL;
+
+/**
+ * Whether the outbound proxy is used.
+ *
+ * The proxy exists for one reason: to reach openrouter.ai from a network that
+ * cannot. A relay does the same job from the other end, so the two are mutually
+ * exclusive and the relay wins - and this is not a preference, it is a bug fix.
+ * Measured: with both set, the server sent the request for `http://localhost:8787`
+ * to the proxy, which cannot resolve a host on this machine, so the relay looked
+ * dead and the log said only `fetch failed`.
+ *
+ * Leaving a stale `OUTBOUND_PROXY` in `.env` while moving to a relay is the
+ * obvious thing for a person to do, so it has to be harmless.
+ */
+export const isProxyConfigured = (): boolean =>
+  config.outboundProxy !== '' && !isRelayConfigured();

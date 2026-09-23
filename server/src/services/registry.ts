@@ -111,6 +111,31 @@ async function discover(): Promise<void> {
   void probeAll();
 }
 
+/**
+ * Rejects if `work` has not settled within `ms`.
+ *
+ * `ensureDiscovered` shares one in-flight promise between callers, and a promise
+ * that never settles poisons it for the life of the process: every later request
+ * awaits the same stuck discovery, the registry stays empty, and the only
+ * symptom is a route that hangs with nothing in the log. Measured while building
+ * the relay - a fetch whose response body never ended left `/api/models` hanging
+ * for minutes, and an `AbortSignal.timeout` on that same fetch did not help,
+ * because the hang was in reading the body and it outlived the signal. A hard
+ * deadline here means the worst case is a slow answer, not a dead process.
+ *
+ * The underlying request may still be in flight; it is abandoned, not awaited.
+ */
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Upstream did not answer within ${ms} ms.`)),
+      ms,
+    );
+
+    work.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 export async function ensureDiscovered(force = false): Promise<ModelInfo[]> {
   const stale = Date.now() - state.refreshedAt > config.registryTtlMs;
   const hasData = state.models.length > 0;
@@ -118,7 +143,7 @@ export async function ensureDiscovered(force = false): Promise<ModelInfo[]> {
   if (!force && hasData && !stale) return state.models;
 
   if (!state.discovery) {
-    state.discovery = discover()
+    state.discovery = withDeadline(discover(), config.discoveryDeadlineMs)
       .catch((error: unknown) => {
         state.lastError =
           error instanceof Error ? error.message : 'Model discovery failed.';
@@ -400,8 +425,4 @@ export function snapshot(): {
     lastError: state.lastError,
     quota: state.quota,
   };
-}
-
-export function isKnownModel(modelId: string): boolean {
-  return state.models.some((model) => model.id === modelId);
 }
