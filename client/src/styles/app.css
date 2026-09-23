@@ -109,7 +109,7 @@ button {
 
 .header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--gap-4);
   padding: 6px 2px 16px;
@@ -131,7 +131,7 @@ button {
 
 .header__divider {
   width: 1px;
-  height: 20px;
+  height: 26px;
   background: var(--border-strong);
 }
 
@@ -184,6 +184,120 @@ button {
 .icon-button--small {
   width: 28px;
   height: 28px;
+}
+
+/* ------------------------------------------------------ telegram CTA ------ */
+
+/*
+ * Proportions are copied from the site's pill, not eyeballed: the label sits
+ * at roughly 0.3 of the height and the side padding at roughly 0.44. `sm` is
+ * scaled down to line up with the 34px controls in the header; `md` is the
+ * hero size used inside an answer.
+ */
+.tg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--cta-bg);
+  color: var(--cta-fg);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: opacity 0.16s var(--ease), transform 0.16s var(--ease);
+}
+
+.tg-button:hover {
+  opacity: 0.88;
+}
+
+.tg-button:active {
+  transform: translateY(1px);
+}
+
+.tg-button__icon {
+  flex: none;
+}
+
+/* Only one of the two labels is visible, depending on the breakpoint. */
+.tg-button__label--short {
+  display: none;
+}
+
+.tg-button__arrow {
+  flex: none;
+  transition: transform 0.16s var(--ease);
+}
+
+.tg-button:hover .tg-button__arrow {
+  transform: translateX(2px);
+}
+
+.tg-button--sm {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  gap: 7px;
+}
+
+.tg-button--sm .tg-button__icon {
+  width: 15px;
+  height: 15px;
+}
+
+.tg-button--md {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 14px;
+}
+
+.tg-button--md .tg-button__icon {
+  width: 17px;
+  height: 17px;
+}
+
+.tg-button--md .tg-button__arrow {
+  width: 16px;
+  height: 16px;
+}
+
+/* ------------------------------------------------- service upsell card ---- */
+
+.service-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.service-cta__kicker {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.service-cta__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.service-cta__summary {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 /* --------------------------------------------------------- theme switch --- */
@@ -887,7 +1001,9 @@ kbd {
   }
 
   .header {
+    flex-wrap: wrap;
     align-items: center;
+    row-gap: 10px;
     padding-bottom: 12px;
   }
 
@@ -896,16 +1012,31 @@ kbd {
   }
 
   .header__logo {
-    height: 15px;
+    height: 22px;
     width: auto;
   }
 
   .header__divider {
-    height: 16px;
+    height: 20px;
   }
 
   .header__title {
     font-size: var(--text-sm);
+  }
+
+  /* The controls move to their own row: a 34px pill plus the theme bar plus
+     the clear button do not fit next to the wordmark on a phone. */
+  .header__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tg-button__label {
+    display: none;
+  }
+
+  .tg-button__label--short {
+    display: inline;
   }
 
   .chat__log {

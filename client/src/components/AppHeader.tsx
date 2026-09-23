@@ -1,6 +1,8 @@
 import { Trash2 } from 'lucide-react';
 import { Logo } from './Logo';
+import { TelegramButton } from './TelegramButton';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { THEME_PICKER_ENABLED } from '../lib/theme';
 import type { ThemeMode, ThemeName } from '../types/chat';
 
 interface Props {
@@ -23,7 +25,7 @@ export function AppHeader({
   return (
     <header className="header">
       <div className="header__brand">
-        <Logo className="header__logo" height={19} />
+        <Logo className="header__logo" height={28} />
         <span className="header__divider" aria-hidden="true" />
         <h1 className="header__title">
           чат с <em>Амалией</em>
@@ -31,12 +33,16 @@ export function AppHeader({
       </div>
 
       <div className="header__actions">
-        <ThemeSwitcher
-          theme={theme}
-          mode={mode}
-          onThemeChange={onThemeChange}
-          onToggleMode={onToggleMode}
-        />
+        <TelegramButton size="sm" />
+
+        {THEME_PICKER_ENABLED ? (
+          <ThemeSwitcher
+            theme={theme}
+            mode={mode}
+            onThemeChange={onThemeChange}
+            onToggleMode={onToggleMode}
+          />
+        ) : null}
 
         <button
           type="button"

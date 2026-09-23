@@ -7,7 +7,7 @@
       name="description"
       content="Чат с Амалией, бухгалтером-консультантом сервиса САЛЬДО: расходы, первичные документы и учёт входящего НДС."
     />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>чат с Амалией</title>
 
@@ -19,26 +19,15 @@
     />
 
     <script>
-      // Apply the stored theme before first paint so there is no flash of the
-      // wrong palette. Kept inline and tiny on purpose.
+      // Palette and brightness are pinned to the scheme of the main site while
+      // the picker is hidden (see client/src/lib/theme.ts). Still inline and
+      // before first paint, so nothing flashes; when the picker comes back,
+      // restore the localStorage lookup and the prefers-color-scheme fallback
+      // here, and set the meta tag above back to "light dark".
       (function () {
-        try {
-          var stored = JSON.parse(localStorage.getItem('saldo-chat:theme:v1') || 'null');
-          var mode =
-            stored && (stored.mode === 'light' || stored.mode === 'dark')
-              ? stored.mode
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
-          var names = ['cream', 'indigo', 'mint'];
-          var theme = stored && names.indexOf(stored.name) !== -1 ? stored.name : 'cream';
-
-          document.documentElement.dataset.theme = theme;
-          document.documentElement.dataset.mode = mode;
-          document.documentElement.style.colorScheme = mode;
-        } catch (error) {
-          /* defaults from the html tag are fine */
-        }
+        document.documentElement.dataset.theme = 'cream';
+        document.documentElement.dataset.mode = 'light';
+        document.documentElement.style.colorScheme = 'light';
       })();
     </script>
   </head>

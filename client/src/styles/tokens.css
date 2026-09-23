@@ -202,3 +202,38 @@
 :root[data-theme='mint'][data-mode='dark'] {
   --on-accent: #06231a;
 }
+
+/*
+ * Telegram CTA pill. On saldo.chat the primary action is a near-black pill on
+ * the warm paper background; in dark mode that relationship flips, so the pill
+ * takes the foreground colour and the label takes the background one.
+ */
+:root[data-theme='cream'] {
+  --cta-bg: #1a1a1a;
+  --cta-fg: #f8f3ea;
+}
+
+:root[data-theme='indigo'] {
+  --cta-bg: #16161d;
+  --cta-fg: #ffffff;
+}
+
+:root[data-theme='mint'] {
+  --cta-bg: #10201a;
+  --cta-fg: #ffffff;
+}
+
+:root[data-theme='cream'][data-mode='dark'] {
+  --cta-bg: #f4efe7;
+  --cta-fg: #1e1e2e;
+}
+
+:root[data-theme='indigo'][data-mode='dark'] {
+  --cta-bg: #ececf5;
+  --cta-fg: #16161d;
+}
+
+:root[data-theme='mint'][data-mode='dark'] {
+  --cta-bg: #e6f2ec;
+  --cta-fg: #10201a;
+}
