@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.refs/
+openrouter_free_logic/
+.playwright-mcp/
+*.log
+
+# Local working notes: the assignment text and my own stack notes. The second
+# file contains a live API key, so it must never be tracked.
+TASK.md
+стек.txt
