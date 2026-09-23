@@ -300,6 +300,10 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
       },
     });
 
+    console.log(
+      `[api] ${requestId.slice(0, 8)} answered script=${intent} spent=0`,
+    );
+
     if (!clientGone && !res.writableEnded) res.end();
     return;
   }
@@ -481,6 +485,13 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
   if (!clientGone && contentChars === 0) {
     markCooldown(opened.model);
   }
+
+  // One line per answered request, because the free tier is metered and the
+  // only way to answer "where did the day's budget go" is to write it down.
+  // Attempts beyond the first are failed calls, which upstream does not count.
+  console.log(
+    `[api] ${requestId.slice(0, 8)} answered model=${opened.model} attempts=${opened.attempts} chars=${contentChars} elapsed=${Date.now() - startedAt}ms key=${currentKeyNumber()}`,
+  );
 
   send({
     event: 'done',

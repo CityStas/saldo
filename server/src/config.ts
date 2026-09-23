@@ -81,12 +81,13 @@ export const config = {
    * How many free models are probed in the background at startup.
    *
    * On by default, because the first message of a session should not land on a
-   * model that is dead right now. The number is deliberately small: the free
-   * tier gives 50 requests per day per key, and a probe is a real request, so a
-   * large fan-out at every restart would eat the day's budget before anyone
-   * asked a question. Six is enough to have proven candidates to prefer.
+   * model that is dead right now. Kept deliberately tiny: a probe is a real
+   * request against a budget of 50 per day per key, and the server is restarted
+   * many times during development, so every restart spends this many requests.
+   * Three is enough to have a proven candidate to prefer without turning
+   * `npm run start` into a way to burn the day's budget.
    */
-  probeLimit: num('PROBE_LIMIT', 6),
+  probeLimit: num('PROBE_LIMIT', 3),
   /** Probes in flight at once. The reference implementation fans out all at once. */
   probeConcurrency: num('PROBE_CONCURRENCY', 4),
   /**

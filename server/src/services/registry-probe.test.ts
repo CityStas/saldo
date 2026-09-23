@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * The probe pool is the part of model selection that is easy to get subtly
  * wrong: a `queue.shift()` loop can silently probe a model twice, or stop after
  * the first worker drains the queue, and nothing in the UI would show it. These
  * tests use a mocked upstream so the pool can be observed directly.
+ *
+ * Two things make the observations repeatable. Discovery fires a probe round in
+ * the background without awaiting it, so the fixture drains that round first and
+ * only then starts counting. And the counters are reset per test, because the
+ * module keeps its state between tests in the same file.
  */
 const spy = vi.hoisted(() => ({
   probed: [] as string[],
@@ -46,11 +51,31 @@ vi.mock('./openrouter.js', () => ({
 
 const { ensureDiscovered, probeAll, snapshot } = await import('./registry.js');
 
-describe('probeAll', () => {
-  it('probes every discovered model exactly once', async () => {
-    spy.probed.length = 0;
+/**
+ * Run probe rounds until one of them finds nothing left to check.
+ *
+ * `probeAll` returns the round that is already running, and a fresh round is
+ * capped by `config.probeLimit`, so a single call is not guaranteed to cover
+ * the whole catalog. The loop makes the starting point of every test the same
+ * regardless of how discovery timed its own background round.
+ */
+async function drain(): Promise<void> {
+  for (let round = 0; round < MODEL_IDS.length + 1; round += 1) {
+    const before = spy.probed.length;
+    await probeAll();
+    if (spy.probed.length === before) break;
+  }
+}
 
+describe('probeAll', () => {
+  beforeEach(async () => {
     await ensureDiscovered(true);
+    await drain();
+    spy.probed.length = 0;
+    spy.maxInFlight = 0;
+  });
+
+  it('probes every discovered model exactly once', async () => {
     await probeAll(true);
 
     expect(new Set(spy.probed).size).toBe(MODEL_IDS.length);
@@ -58,7 +83,6 @@ describe('probeAll', () => {
   });
 
   it('marks the models it probed as working', async () => {
-    await ensureDiscovered(true);
     await probeAll(true);
 
     const working = snapshot().models.filter(
@@ -70,11 +94,22 @@ describe('probeAll', () => {
   });
 
   it('runs probes in parallel, not one at a time', async () => {
-    spy.maxInFlight = 0;
-
-    await ensureDiscovered(true);
     await probeAll(true);
 
     expect(spy.maxInFlight).toBeGreaterThan(1);
+  });
+
+  it('does not spend a second round on models it just probed', async () => {
+    // Catalog discovery re-runs every ten minutes, and every run asked for a
+    // fresh probe round. With a five minute recheck window that cost up to six
+    // requests per ten minutes of uptime - the whole daily budget of 50 in
+    // about an hour and a half, spent on asking models to say "hi".
+    await probeAll(true);
+    const afterFirstRound = spy.probed.length;
+    expect(afterFirstRound).toBe(MODEL_IDS.length);
+
+    await probeAll();
+
+    expect(spy.probed).toHaveLength(afterFirstRound);
   });
 });

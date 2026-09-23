@@ -11,7 +11,18 @@ import type { ModelInfo, ModelStatus } from '../types/chat.js';
 /** Router model that picks a free model upstream. Always kept as last resort. */
 const ROUTER_MODEL = 'openrouter/free';
 
-const WORKING_RECHECK_MS = 5 * 60_000;
+/**
+ * How long a probe result is trusted before the model is probed again.
+ *
+ * This is deliberately long. An earlier version re-probed anything checked more
+ * than five minutes ago, and because catalog discovery runs every ten minutes,
+ * a running server spent up to six requests every ten minutes doing nothing but
+ * asking models to say "hi". At 50 requests per day per key that is the whole
+ * budget in about an hour and a half of uptime, before a single user question.
+ * Model health is learned from real traffic; a probe only has to cover the gap
+ * before the first real request.
+ */
+const WORKING_RECHECK_MS = 6 * 60 * 60_000;
 
 /** How long a quota reading stays usable before it is asked for again. */
 const QUOTA_TTL_MS = 15_000;
@@ -169,6 +180,8 @@ export async function probeAll(force = false): Promise<void> {
   // to learn nothing.
   if (now < state.limitUntil) return;
 
+  // Unknown models are always worth one request; a known one is only re-checked
+  // after WORKING_RECHECK_MS, which is hours. Real traffic keeps the rest fresh.
   const targets = state.models
     .filter(
       (model) =>
