@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Markdown } from './Markdown';
+import { ServiceCta } from './ServiceCta';
 import { formatDuration, formatTime } from '../lib/format';
+import { splitServiceMarker } from '../lib/service-marker';
 import type { ChatMessage } from '../types/chat';
 
 interface Props {
@@ -20,9 +22,15 @@ export function MessageBubble({ message }: Props) {
   const isUser = message.role === 'user';
   const statusLabel = STATUS_LABEL[message.status];
 
+  // The service tag is an instruction to the UI, not part of the answer, so it
+  // never reaches the rendered text or the clipboard.
+  const { text: body, service } = isUser
+    ? { text: message.content, service: null }
+    : splitServiceMarker(message.content);
+
   const copy = async (): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await navigator.clipboard.writeText(body);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -39,15 +47,19 @@ export function MessageBubble({ message }: Props) {
     >
       <div className="message__bubble">
         {isUser ? (
-          <p className="message__text">{message.content}</p>
-        ) : message.content ? (
-          <Markdown>{message.content}</Markdown>
+          <p className="message__text">{body}</p>
+        ) : body ? (
+          <Markdown>{body}</Markdown>
         ) : (
           <span className="message__caret" aria-hidden="true" />
         )}
 
-        {message.status === 'streaming' && message.content ? (
+        {!isUser && message.status === 'streaming' && body ? (
           <span className="message__caret" aria-hidden="true" />
+        ) : null}
+
+        {service && message.status !== 'streaming' ? (
+          <ServiceCta service={service} />
         ) : null}
       </div>
 
@@ -66,7 +78,7 @@ export function MessageBubble({ message }: Props) {
           </span>
         ) : null}
 
-        {message.content ? (
+        {body ? (
           <button
             type="button"
             className="message__copy"
