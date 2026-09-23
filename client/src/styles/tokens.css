@@ -1,0 +1,204 @@
+/*
+ * Design tokens.
+ *
+ * Two independent axes live on <html>:
+ *   data-theme = cream | indigo | mint   (palette)
+ *   data-mode  = light | dark            (brightness)
+ *
+ * Visual language follows saldo.chat: warm paper backgrounds, white cards with
+ * hairline borders, pill controls, an accent used sparingly, and a serif
+ * italic accent word inside sans-serif headings.
+ */
+
+:root {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono:
+    ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 11.5px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 24px;
+  --gap-6: 32px;
+
+  --shell-width: 880px;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ---------- Cream: the saldo.chat palette ---------- */
+
+:root[data-theme='cream'] {
+  --accent: #e8924a;
+  --accent-ink: #7a4318;
+  --accent-soft: rgba(232, 146, 74, 0.16);
+  --bg: #f5ede0;
+  --bg-alt: #ede4d8;
+  --surface: #ffffff;
+  --surface-2: #fbf7f1;
+  --text: #1a1a1a;
+  --muted: #78716c;
+  --border: #e6dccd;
+  --border-strong: #d8c9b4;
+  --bubble-user-bg: #1e1e2e;
+  --bubble-user-text: #f6f1e9;
+  --danger: #b4453c;
+  --danger-bg: #fbeceb;
+  --code-bg: #f3ece1;
+  --shadow-card: 0 1px 2px rgba(26, 26, 26, 0.04), 0 14px 36px rgba(26, 26, 26, 0.07);
+  --shadow-float: 0 8px 30px rgba(26, 26, 26, 0.12);
+  --backdrop: radial-gradient(120% 60% at 50% -10%, rgba(232, 146, 74, 0.14), transparent 60%);
+}
+
+:root[data-theme='cream'][data-mode='dark'] {
+  --accent: #e8924a;
+  --accent-ink: #f3c79c;
+  --accent-soft: rgba(232, 146, 74, 0.16);
+  --bg: #1e1e2e;
+  --bg-alt: #23233a;
+  --surface: #262638;
+  --surface-2: #2c2c42;
+  --text: #f4efe7;
+  --muted: rgba(244, 239, 231, 0.56);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --bubble-user-bg: #e8924a;
+  --bubble-user-text: #21160c;
+  --danger: #f0a9a2;
+  --danger-bg: rgba(240, 120, 110, 0.14);
+  --code-bg: #1a1a29;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 44px rgba(0, 0, 0, 0.34);
+  --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.45);
+  --backdrop: radial-gradient(120% 60% at 50% -10%, rgba(232, 146, 74, 0.14), transparent 62%);
+}
+
+/* ---------- Indigo: cooler, more product-y ---------- */
+
+:root[data-theme='indigo'] {
+  --accent: #7c3aed;
+  --accent-ink: #4c1d95;
+  --accent-soft: rgba(124, 58, 237, 0.12);
+  --bg: #f4f4f9;
+  --bg-alt: #eaeaf4;
+  --surface: #ffffff;
+  --surface-2: #fafaff;
+  --text: #16161d;
+  --muted: #6b6b7b;
+  --border: #e2e2ee;
+  --border-strong: #cfcfe2;
+  --bubble-user-bg: #221b45;
+  --bubble-user-text: #f4f1ff;
+  --danger: #b4453c;
+  --danger-bg: #fbeceb;
+  --code-bg: #f1f1f9;
+  --shadow-card: 0 1px 2px rgba(22, 22, 29, 0.04), 0 14px 36px rgba(60, 40, 130, 0.08);
+  --shadow-float: 0 8px 30px rgba(40, 20, 100, 0.14);
+  --backdrop: radial-gradient(120% 60% at 50% -10%, rgba(124, 58, 237, 0.12), transparent 60%);
+}
+
+:root[data-theme='indigo'][data-mode='dark'] {
+  --accent: #a78bfa;
+  --accent-ink: #ddd3ff;
+  --accent-soft: rgba(167, 139, 250, 0.16);
+  --bg: #121220;
+  --bg-alt: #181828;
+  --surface: #1c1c2e;
+  --surface-2: #232338;
+  --text: #ececf5;
+  --muted: rgba(236, 236, 245, 0.56);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --bubble-user-bg: #7c3aed;
+  --bubble-user-text: #f6f2ff;
+  --danger: #f0a9a2;
+  --danger-bg: rgba(240, 120, 110, 0.14);
+  --code-bg: #101020;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 44px rgba(0, 0, 0, 0.36);
+  --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.46);
+  --backdrop: radial-gradient(120% 60% at 50% -10%, rgba(124, 58, 237, 0.2), transparent 62%);
+}
+
+/* ---------- Mint: calm, high-contrast green ---------- */
+
+:root[data-theme='mint'] {
+  --accent: #0f9b6c;
+  --accent-ink: #0a5c42;
+  --accent-soft: rgba(15, 155, 108, 0.12);
+  --bg: #f1f7f4;
+  --bg-alt: #e5efea;
+  --surface: #ffffff;
+  --surface-2: #f8fbf9;
+  --text: #10201a;
+  --muted: #5f7268;
+  --border: #dbe7e1;
+  --border-strong: #c3d5cc;
+  --bubble-user-bg: #0e2a22;
+  --bubble-user-text: #e8f5ef;
+  --danger: #b4453c;
+  --danger-bg: #fbeceb;
+  --code-bg: #eef4f1;
+  --shadow-card: 0 1px 2px rgba(16, 32, 26, 0.04), 0 14px 36px rgba(16, 60, 44, 0.07);
+  --shadow-float: 0 8px 30px rgba(10, 50, 36, 0.14);
+  --backdrop: radial-gradient(120% 60% at 50% -10%, rgba(15, 155, 108, 0.13), transparent 60%);
+}
+
+:root[data-theme='mint'][data-mode='dark'] {
+  --accent: #34d399;
+  --accent-ink: #b7f0d8;
+  --accent-soft: rgba(52, 211, 153, 0.14);
+  --bg: #0e1a16;
+  --bg-alt: #12211c;
+  --surface: #16241f;
+  --surface-2: #1c2e28;
+  --text: #e6f2ec;
+  --muted: rgba(230, 242, 236, 0.56);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --bubble-user-bg: #34d399;
+  --bubble-user-text: #06231a;
+  --danger: #f0a9a2;
+  --danger-bg: rgba(240, 120, 110, 0.14);
+  --code-bg: #0b1512;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 44px rgba(0, 0, 0, 0.36);
+  --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.46);
+  --backdrop: radial-gradient(120% 60% at 50% -10%, rgba(52, 211, 153, 0.14), transparent 62%);
+}
+
+/*
+ * Text/icon colour placed on top of `--accent`. Kept separate from `--accent`
+ * so the orange and violet accents can carry dark ink instead of white, which
+ * would fail contrast on those hues.
+ */
+:root[data-theme='cream'] {
+  --on-accent: #2a1a0c;
+}
+
+:root[data-theme='indigo'] {
+  --on-accent: #ffffff;
+}
+
+:root[data-theme='mint'] {
+  --on-accent: #ffffff;
+}
+
+:root[data-theme='indigo'][data-mode='dark'] {
+  --on-accent: #1a1030;
+}
+
+:root[data-theme='mint'][data-mode='dark'] {
+  --on-accent: #06231a;
+}

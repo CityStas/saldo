@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru" data-theme="cream" data-mode="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Чат с Амалией, бухгалтером-консультантом сервиса САЛЬДО: расходы, первичные документы и учёт входящего НДС."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>чат с Амалией</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+    />
+
+    <script>
+      // Apply the stored theme before first paint so there is no flash of the
+      // wrong palette. Kept inline and tiny on purpose.
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem('saldo-chat:theme:v1') || 'null');
+          var mode =
+            stored && (stored.mode === 'light' || stored.mode === 'dark')
+              ? stored.mode
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          var names = ['cream', 'indigo', 'mint'];
+          var theme = stored && names.indexOf(stored.name) !== -1 ? stored.name : 'cream';
+
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.dataset.mode = mode;
+          document.documentElement.style.colorScheme = mode;
+        } catch (error) {
+          /* defaults from the html tag are fine */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
