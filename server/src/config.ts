@@ -40,9 +40,28 @@ const proxyFromEnv =
   process.env.http_proxy ||
   '';
 
+/**
+ * One or more API keys.
+ *
+ * The free tier allows 50 requests per day per key (`free-models-per-day`), and
+ * when that is spent every model answers 429 until the window resets - hours
+ * later. A single key therefore makes the app unusable for the rest of the day
+ * through no fault of the code. `OPENROUTER_API_KEYS` takes a comma-separated
+ * list and the server rotates through it when a key is rejected or its daily
+ * window is spent, which is how the reference implementation stays alive.
+ *
+ * `OPENROUTER_API_KEY` alone still works and is treated as a list of one.
+ */
+const keyList = list('OPENROUTER_API_KEYS');
+const singleKey = str('OPENROUTER_API_KEY');
+const apiKeys = keyList.length > 0 ? keyList : singleKey ? [singleKey] : [];
+
 export const config = {
   port: num('PORT', 3001),
-  apiKey: str('OPENROUTER_API_KEY'),
+  /** First key. Kept for callers that only need "is a key configured". */
+  apiKey: apiKeys[0] ?? '',
+  /** Every usable key, in order. */
+  apiKeys,
   /** Preferred model. Tried first, everything else is a fallback. */
   preferredModel: str('OPENROUTER_MODEL', 'openrouter/free'),
   /** Optional hard allowlist. When set, only these models are used. */
@@ -59,13 +78,39 @@ export const config = {
   firstTokenTimeoutMs: num('FIRST_TOKEN_TIMEOUT_MS', 30_000),
   probeTimeoutMs: num('PROBE_TIMEOUT_MS', 12_000),
   /**
-   * How many free models are probed in the background. 0 by default: the free
-   * tier shares a small per-minute request budget, so spending it on probes
-   * would starve real conversations. Model health is learned from real traffic
-   * instead, and `/api/models/refresh` triggers an explicit probe.
+   * How many free models are probed in the background at startup.
+   *
+   * On by default, because the first message of a session should not land on a
+   * model that is dead right now. The number is deliberately small: the free
+   * tier gives 50 requests per day per key, and a probe is a real request, so a
+   * large fan-out at every restart would eat the day's budget before anyone
+   * asked a question. Six is enough to have proven candidates to prefer.
    */
-  probeLimit: num('PROBE_LIMIT', 0),
-  probeSpacingMs: num('PROBE_SPACING_MS', 2_500),
+  probeLimit: num('PROBE_LIMIT', 6),
+  /** Probes in flight at once. The reference implementation fans out all at once. */
+  probeConcurrency: num('PROBE_CONCURRENCY', 4),
+  /**
+   * Budget for a probe. Small on purpose: a model that needs more than a couple
+   * of dozen tokens to say "hi" is a model that spends everything on
+   * chain-of-thought, and that is exactly the kind of model this chat cannot
+   * use. Cheap probes also mean probing stays cheap.
+   */
+  probeMaxTokens: num('PROBE_MAX_TOKENS', 24),
+  /** Stagger between two probes taken by the same worker. 0 = no stagger. */
+  probeSpacingMs: num('PROBE_SPACING_MS', 0),
+  /**
+   * How long to stop probing after upstream reports a key-wide daily limit.
+   * Probing while the window is spent cannot succeed and only burns the next
+   * key's budget.
+   */
+  probeBackoffMs: num('PROBE_BACKOFF_MS', 10 * 60_000),
+  /**
+   * How long to wait for the configured outbound proxy to accept a TCP
+   * connection at startup. A stale `OUTBOUND_PROXY` (VPN client not running)
+   * used to make every request fail with a network error while a direct
+   * connection would have worked.
+   */
+  proxyCheckTimeoutMs: num('PROXY_CHECK_TIMEOUT_MS', 1_500),
   /** How long a discovered model list stays fresh. */
   registryTtlMs: num('REGISTRY_TTL_MS', 10 * 60_000),
   /** Cooldown after a model returns 429/5xx. */
@@ -78,7 +123,7 @@ export const config = {
 } as const;
 
 export function assertConfig(): void {
-  if (!config.apiKey) {
+  if (config.apiKeys.length === 0) {
     throw new Error(
       'OPENROUTER_API_KEY is not set. Copy .env.example to .env and add your key.',
     );

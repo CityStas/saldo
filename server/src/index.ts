@@ -5,6 +5,7 @@ import { AppError } from './lib/errors.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { chatRouter } from './routes/chat.js';
 import { modelsRouter } from './routes/models.js';
+import { checkProxy, isProxyInUse } from './services/openrouter.js';
 import { ensureDiscovered, probeAll, snapshot } from './services/registry.js';
 
 assertConfig();
@@ -26,7 +27,7 @@ app.get('/api/health', (_req, res) => {
   const { models, refreshedAt, lastError } = snapshot();
   res.json({
     ok: true,
-    proxy: isProxyConfigured(),
+    proxy: isProxyInUse(),
     models: models.length,
     working: models.filter((model) => model.status === 'working').length,
     refreshedAt,
@@ -56,27 +57,38 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: { code: 'UNKNOWN', message } });
 });
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, async () => {
   console.log(`[api] listening on http://localhost:${config.port}`);
-  console.log(
-    `[api] outbound proxy: ${isProxyConfigured() ? config.outboundProxy : 'direct'}`,
-  );
+
+  // A stale `OUTBOUND_PROXY` (VPN client not running) used to make every
+  // request fail on a machine that could reach OpenRouter directly. Check once,
+  // at startup, and fall back to the direct route if the port is dead.
+  if (isProxyConfigured()) {
+    const reachable = await checkProxy();
+    console.log(
+      reachable
+        ? `[api] outbound proxy: ${config.outboundProxy}`
+        : `[api] outbound proxy ${config.outboundProxy} is not reachable - using a direct connection`,
+    );
+  } else {
+    console.log('[api] outbound proxy: direct');
+  }
 
   // Warm the model registry in the background: the first user request should
-  // not pay for catalog discovery, and probe results are only advisory.
+  // not pay for catalog discovery.
   void ensureDiscovered()
     .then(() => {
       const { models } = snapshot();
       console.log(`[api] ${models.length} free models discovered`);
 
-      // Probing spends the shared free-tier request budget, so it only runs
-      // when PROBE_LIMIT is set explicitly.
       if (config.probeLimit <= 0) {
         console.log('[api] background probing disabled (PROBE_LIMIT=0)');
         return;
       }
 
-      console.log(`[api] probing up to ${config.probeLimit} models...`);
+      console.log(
+        `[api] probing up to ${config.probeLimit} models, ${config.probeConcurrency} at a time...`,
+      );
       return probeAll().then(() => {
         const working = snapshot().models.filter(
           (model) => model.status === 'working',

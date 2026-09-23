@@ -1,3 +1,4 @@
+import net from 'node:net';
 import { ProxyAgent, type Dispatcher } from 'undici';
 import { config } from '../config.js';
 import { SseDecoder } from '../lib/sse.js';
@@ -11,12 +12,72 @@ const APP_URL = 'https://github.com/CityStas/saldo';
 let cachedDispatcher: Dispatcher | null = null;
 
 /**
+ * Whether the configured proxy is actually listening.
+ *
+ * `null` means "not checked yet": until the startup check runs, a configured
+ * proxy is used as-is, so the behaviour of an already working setup does not
+ * change. After the check, `false` means the proxy port refused a connection
+ * and the direct route is used instead.
+ *
+ * This matters because `OUTBOUND_PROXY` usually points at a local VPN client.
+ * With the VPN off, the port is dead, and a hard-wired proxy turned that into
+ * "nothing works" even on a machine that could reach OpenRouter directly.
+ */
+let proxyUsable: boolean | null = null;
+
+function parseProxy(url: string): { host: string; port: number } | null {
+  try {
+    const parsed = new URL(url);
+    const port = Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80));
+    if (!parsed.hostname || !Number.isFinite(port)) return null;
+    return { host: parsed.hostname, port };
+  } catch {
+    return null;
+  }
+}
+
+/** TCP-connect test with a short deadline. No HTTP, no TLS, no credentials. */
+export async function checkProxy(): Promise<boolean> {
+  const target = config.outboundProxy ? parseProxy(config.outboundProxy) : null;
+
+  if (!target) {
+    proxyUsable = false;
+    return false;
+  }
+
+  const reachable = await new Promise<boolean>((resolve) => {
+    const socket = net.connect({ host: target.host, port: target.port });
+    let settled = false;
+
+    const finish = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(ok);
+    };
+
+    socket.setTimeout(config.proxyCheckTimeoutMs, () => finish(false));
+    socket.once('connect', () => finish(true));
+    socket.once('error', () => finish(false));
+  });
+
+  proxyUsable = reachable;
+  return reachable;
+}
+
+/** True when a proxy is configured AND was reachable at the last check. */
+export function isProxyInUse(): boolean {
+  return config.outboundProxy !== '' && proxyUsable !== false;
+}
+
+/**
  * Optional outbound proxy. On networks where Cloudflare rejects non-browser
  * TLS fingerprints (or where the API host is unreachable) the whole backend is
  * dead without this, so it is a first-class config knob rather than a hack.
  */
 function dispatcher(): Dispatcher | undefined {
   if (!config.outboundProxy) return undefined;
+  if (proxyUsable === false) return undefined;
   cachedDispatcher ??= new ProxyAgent(config.outboundProxy);
   return cachedDispatcher;
 }
@@ -30,9 +91,75 @@ export function upstreamFetch(
   return fetch(url, { ...init, dispatcher: agent } as RequestInit);
 }
 
+/**
+ * Which key the next upstream call uses.
+ *
+ * The free tier gives 50 requests per day per key. When the window is spent the
+ * key answers 429 for every model until it resets - which the API reports as
+ * hours away. Rotating keys is the only thing that keeps a free-tier chat alive
+ * past its first fifty questions, and it is what the reference implementation
+ * does.
+ */
+let keyIndex = 0;
+
+/** Per-key "do not use before" marks, in ms since epoch. */
+const keyCooldownUntil = new Map<number, number>();
+
+/**
+ * How long a key is parked after upstream rejects its credentials.
+ *
+ * A 401 is terminal by design everywhere else in this codebase (`isRetryable`
+ * refuses to retry it), and here it means the same thing: this key will not
+ * start working again on the next message. Without parking it, every request
+ * would begin on the dead key, fail, rotate, and only then reach a working one.
+ */
+export const AUTH_KEY_PARK_MS = 24 * 60 * 60_000;
+
+export function apiKeyCount(): number {
+  return config.apiKeys.length;
+}
+
+export function currentApiKey(): string {
+  return config.apiKeys[keyIndex] ?? '';
+}
+
+/** Index of the current key, 1-based, for logging. Never the key itself. */
+export function currentKeyNumber(): number {
+  return keyIndex + 1;
+}
+
+/**
+ * Move to the next key that is not on cooldown.
+ *
+ * Returns false when there is only one key, or when every other key is still
+ * inside its daily window. It never "rotates" onto the current key: reporting a
+ * successful rotation that changes nothing would hide the real error behind a
+ * second identical attempt.
+ */
+export function rotateApiKey(retryAfterMs?: number): boolean {
+  const total = config.apiKeys.length;
+  if (total <= 1) return false;
+
+  if (retryAfterMs !== undefined) {
+    keyCooldownUntil.set(keyIndex, Date.now() + retryAfterMs);
+  }
+
+  const now = Date.now();
+
+  for (let step = 1; step < total; step += 1) {
+    const candidate = (keyIndex + step) % total;
+    if ((keyCooldownUntil.get(candidate) ?? 0) <= now) {
+      keyIndex = candidate;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function headers(): Record<string, string> {
   return {
-    Authorization: `Bearer ${config.apiKey}`,
+    Authorization: `Bearer ${currentApiKey()}`,
     'Content-Type': 'application/json',
     'HTTP-Referer': APP_URL,
     'X-Title': APP_TITLE,
@@ -75,7 +202,7 @@ export async function listFreeModels(
   signal?: AbortSignal,
 ): Promise<OpenRouterModel[]> {
   const response = await upstreamFetch(`${BASE_URL}/models`, {
-    headers: { Authorization: `Bearer ${config.apiKey}` },
+    headers: { Authorization: `Bearer ${currentApiKey()}` },
     signal,
   });
 
@@ -121,7 +248,7 @@ export async function fetchFreeQuota(
   signal?: AbortSignal,
 ): Promise<FreeQuota | null> {
   const response = await upstreamFetch(`${BASE_URL}/key`, {
-    headers: { Authorization: `Bearer ${config.apiKey}` },
+    headers: { Authorization: `Bearer ${currentApiKey()}` },
     signal,
   });
 
@@ -270,6 +397,10 @@ interface ProbePayload {
  * chain-of-thought answers with an empty `content`, and such a model is
  * unusable for this chat - it would stall the first-token watchdog. It is
  * reported as `error` on purpose so it never reaches the pool.
+ *
+ * The budget is deliberately tiny (`PROBE_MAX_TOKENS`, 24 by default). A model
+ * that cannot say "hi" in a couple of dozen tokens is a model that thinks
+ * before it talks, and that is the failure this check exists to catch.
  */
 export async function probeModel(
   modelId: string,
@@ -283,7 +414,7 @@ export async function probeModel(
       body: JSON.stringify({
         model: modelId,
         messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 256,
+        max_tokens: config.probeMaxTokens,
         temperature: 0.1,
       }),
     });

@@ -13,7 +13,14 @@ import {
 } from '../lib/errors.js';
 import { encodeSse } from '../lib/sse.js';
 import { validateChatRequest } from '../lib/validation.js';
-import { openChatStream, readChatStream } from '../services/openrouter.js';
+import {
+  AUTH_KEY_PARK_MS,
+  apiKeyCount,
+  currentKeyNumber,
+  openChatStream,
+  readChatStream,
+  rotateApiKey,
+} from '../services/openrouter.js';
 import { withSystemPrompt } from '../services/system-prompt.js';
 import {
   cannedAnswer,
@@ -23,9 +30,9 @@ import {
 } from '../services/dialogue-policy.js';
 import {
   ensureDiscovered,
-  getQuota,
   markCooldown,
   markWorking,
+  noteGlobalLimit,
   selectCandidates,
 } from '../services/registry.js';
 import type { ChatMessage, ChatRequestBody, ServerEvent } from '../types/chat.js';
@@ -51,7 +58,7 @@ interface OpenedStream {
  * `:free` catalog that is the difference between "the app works" and "the app
  * shows a rate limit error half the time".
  */
-async function openFirstWorkingStream(
+async function tryCandidates(
   messages: ChatMessage[],
   requestedModel: string | undefined,
   signal: AbortSignal,
@@ -117,6 +124,64 @@ async function openFirstWorkingStream(
 
       markCooldown(candidate.id);
       if (!isRetryable(lastError)) throw lastError;
+    }
+  }
+
+  throw (
+    lastError ?? new AppError('UPSTREAM_ERROR', 'Every candidate model failed.', 502)
+  );
+}
+
+/**
+ * True when the failure is about the KEY rather than the model, and another key
+ * might therefore do better.
+ *
+ * A model-scoped 429 means "this model is busy, try another" and rotating keys
+ * would not help. An AUTH failure or a key-wide daily limit means every model
+ * behind this key will fail the same way.
+ */
+function isKeyScoped(error: AppError): boolean {
+  if (error.code === 'AUTH') return true;
+  return error.code === 'RATE_LIMIT' && error.scope === 'global';
+}
+
+/**
+ * Walk the model list, and when the whole key is spent, walk the next key.
+ *
+ * The free tier allows 50 requests per day per key, and when that is gone every
+ * model answers 429 for hours. Without a second key the honest answer is "the
+ * limit is spent, it resets at such a time" - with one, the chat simply keeps
+ * working, which is what the reference implementation does.
+ */
+async function openFirstWorkingStream(
+  messages: ChatMessage[],
+  requestedModel: string | undefined,
+  signal: AbortSignal,
+): Promise<OpenedStream> {
+  const keysToTry = Math.max(1, apiKeyCount());
+  let lastError: AppError | null = null;
+
+  for (let attempt = 0; attempt < keysToTry; attempt += 1) {
+    try {
+      return await tryCandidates(messages, requestedModel, signal);
+    } catch (error) {
+      if (!(error instanceof AppError) || !isKeyScoped(error)) throw error;
+
+      lastError = error;
+      noteGlobalLimit(error.retryAfterMs);
+
+      // A rejected key is parked for a day, a spent one until its window
+      // resets. Read the number BEFORE rotating, or the log names the key that
+      // was just switched to and reads as nonsense.
+      const failedKey = currentKeyNumber();
+      const parkMs =
+        error.code === 'AUTH' ? AUTH_KEY_PARK_MS : error.retryAfterMs;
+
+      if (!rotateApiKey(parkMs)) throw error;
+
+      console.warn(
+        `[api] key ${failedKey} failed (${error.code}), switched to key ${currentKeyNumber()} of ${keysToTry}`,
+      );
     }
   }
 
@@ -244,18 +309,19 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
   try {
     await ensureDiscovered();
 
-    // Every `:free` model draws on ONE daily request cap for the whole key, so
-    // once it is spent there is nothing to fail over to. Checking first turns a
-    // string of confusing provider errors into one accurate message.
-    const quota = await getQuota();
-    if (quota && quota.remaining <= 0) {
-      throw new AppError(
-        'RATE_LIMIT',
-        `Daily free-model quota is exhausted (${quota.used}/${quota.limit}).`,
-        429,
-        { scope: 'global' },
-      );
-    }
+    // Deliberately NO pre-flight quota gate here.
+    //
+    // An earlier version read `free_model_daily_requests` from `GET /key` and
+    // refused to try when `remaining <= 0`. Measured 2026-09: the endpoint
+    // reports `{used: 51, limit: 50, remaining: 0}` while free models keep
+    // answering with HTTP 200 and `cost: 0`. The counter is a lagging hint that
+    // can run past its own limit; it is not an enforced ceiling. Blocking on it
+    // turned a working request into "лимит исчерпан" - the worst kind of bug,
+    // because the app looked broken while the provider was fine.
+    //
+    // A real limit arrives as a 429 and is classified in `fromUpstreamStatus`,
+    // where `limit_source` decides between a model-scoped and a key-scoped
+    // limit. The counter is still exposed on `/api/models` for diagnostics.
 
     opened = await openFirstWorkingStream(
       withSystemPrompt(body.messages, { opening, mode: body.mode }),

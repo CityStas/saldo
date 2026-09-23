@@ -24,6 +24,8 @@ interface RegistryState {
   lastError: string | null;
   quota: FreeQuota | null;
   quotaCheckedAt: number;
+  /** No key can serve a request before this moment. Stops pointless probing. */
+  limitUntil: number;
 }
 
 const state: RegistryState = {
@@ -34,6 +36,7 @@ const state: RegistryState = {
   lastError: null,
   quota: null,
   quotaCheckedAt: 0,
+  limitUntil: 0,
 };
 
 /** Round-robin cursor, so consecutive requests do not hammer one model. */
@@ -120,14 +123,16 @@ export async function ensureDiscovered(force = false): Promise<ModelInfo[]> {
 }
 
 /**
- * Cached free-tier quota.
+ * Cached free-tier daily counter. DIAGNOSTIC ONLY - never a gate.
  *
- * Every chat request needs this answer before it picks a model, so asking
- * OpenRouter each time would add a call per message. A short TTL is enough:
- * the number only moves when this process spends requests.
+ * Measured 2026-09: this counter reported `{used: 51, limit: 50, remaining: 0}`
+ * while free models answered normally with HTTP 200 and `cost: 0`. It lags and
+ * can run past its own limit, so treating it as a ceiling blocks working
+ * requests. It is exposed on `/api/models` and nowhere else; the chat path
+ * decides on the actual upstream response.
  *
- * On failure the previous reading is kept rather than blocking chat on a
- * failed check - a stale quota is a hint, not a gate that must be accurate.
+ * On failure the previous reading is kept rather than dropping to null - a
+ * stale number is more useful than no number.
  */
 export async function getQuota(): Promise<FreeQuota | null> {
   if (Date.now() - state.quotaCheckedAt < QUOTA_TTL_MS) return state.quota;
@@ -144,13 +149,25 @@ export async function getQuota(): Promise<FreeQuota | null> {
   return state.quota;
 }
 
-/** Background liveness probing, so the UI can show real model availability. */
+/** Background liveness probing, so the UI can show real model availability and,
+ * more importantly, so the first message of a session has a proven model to go
+ * to instead of a round-robin draw that may land on something dead.
+ *
+ * Probes run in parallel with a bounded worker pool rather than one at a time.
+ * The reference implementation fans out all thirty at once; a cap of four keeps
+ * the shape of that approach without opening thirty sockets at startup.
+ */
 export async function probeAll(force = false): Promise<void> {
   if (state.probing) return state.probing;
 
   const now = Date.now();
 
   if (!force && config.probeLimit <= 0) return;
+
+  // Probing while the whole key is spent cannot succeed: every probe would
+  // answer 429, mark a healthy model as broken, and spend the next key's budget
+  // to learn nothing.
+  if (now < state.limitUntil) return;
 
   const targets = state.models
     .filter(
@@ -163,23 +180,51 @@ export async function probeAll(force = false): Promise<void> {
 
   if (targets.length === 0) return;
 
+  const probeOne = async (model: ModelInfo): Promise<ModelStatus> => {
+    const status: ModelStatus = await probeModel(
+      model.id,
+      AbortSignal.timeout(config.probeTimeoutMs),
+    );
+
+    model.status = status;
+    model.checkedAt = Date.now();
+
+    // `rate_limited` means "busy right now", not "broken". Parking a healthy
+    // model because it answered 429 would take the whole pool out of rotation
+    // for a minute every time the key is being throttled.
+    model.cooldownUntil =
+      status === 'working' || status === 'rate_limited'
+        ? 0
+        : Date.now() + config.modelCooldownMs;
+
+    if (config.probeSpacingMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, config.probeSpacingMs));
+    }
+
+    return status;
+  };
+
   state.probing = (async () => {
-    // Sequential with a gap: the free tier shares one per-minute request
-    // bucket across every model, so a parallel fan-out would rate-limit itself.
-    for (const model of targets) {
-      const status: ModelStatus = await probeModel(
-        model.id,
-        AbortSignal.timeout(config.probeTimeoutMs),
-      );
+    const queue = [...targets];
+    const workers = Math.max(1, Math.min(config.probeConcurrency, queue.length));
+    const results: ModelStatus[] = [];
 
-      model.status = status;
-      model.checkedAt = Date.now();
-      model.cooldownUntil =
-        status === 'working' ? 0 : Date.now() + config.modelCooldownMs;
+    await Promise.all(
+      Array.from({ length: workers }, async () => {
+        for (let model = queue.shift(); model; model = queue.shift()) {
+          // A dead model must not take the whole pool down with it.
+          const status = await probeOne(model).catch(
+            () => 'error' as ModelStatus,
+          );
+          results.push(status);
+        }
+      }),
+    );
 
-      if (config.probeSpacingMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, config.probeSpacingMs));
-      }
+    // Every probe throttled at once is not twenty broken models, it is one
+    // spent key. Say so and stop probing instead of branding the pool as dead.
+    if (results.length > 0 && results.every((s) => s === 'rate_limited')) {
+      noteGlobalLimit();
     }
   })()
     .catch(() => undefined)
@@ -315,6 +360,19 @@ export function markWorking(modelId: string, latencyMs?: number): void {
         ? latencyMs
         : Math.round(model.latencyMs * 0.6 + latencyMs * 0.4);
   }
+}
+
+/**
+ * Record that upstream refused every key with a daily-limit 429.
+ *
+ * Used only to pause probing. Chat itself never refuses on this signal: the
+ * counter that reports the limit is unreliable, so the request path always
+ * tries and reports whatever upstream actually says.
+ */
+export function noteGlobalLimit(retryAfterMs?: number): void {
+  const window = retryAfterMs ?? config.probeBackoffMs;
+  const until = Date.now() + Math.min(window, config.probeBackoffMs);
+  if (until > state.limitUntil) state.limitUntil = until;
 }
 
 export function snapshot(): {

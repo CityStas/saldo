@@ -5,7 +5,7 @@ import {
   probeAll,
   snapshot,
 } from '../services/registry.js';
-import { isProxyConfigured } from '../config.js';
+import { isProxyInUse } from '../services/openrouter.js';
 
 export const modelsRouter = Router();
 
@@ -14,8 +14,9 @@ export const modelsRouter = Router();
  * chat does not expose which model answered - but it is the fastest way to see
  * what the selector has learned while debugging.
  *
- * The free-tier quota is included for the same reason: the whole pool shares
- * one daily request cap, and when it runs out every model looks broken.
+ * The free-tier counter is included as a diagnostic, NOT as a decision: it lags
+ * and can report `remaining: 0` while models answer normally. Nothing in the
+ * request path reads it.
  */
 modelsRouter.get('/models', async (_req, res) => {
   const models = await ensureDiscovered();
@@ -25,7 +26,7 @@ modelsRouter.get('/models', async (_req, res) => {
   res.json({
     source: 'openrouter',
     refreshedAt,
-    proxy: isProxyConfigured(),
+    proxy: isProxyInUse(),
     lastError,
     quota,
     models: models.map(
