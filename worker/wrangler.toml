@@ -1,0 +1,12 @@
+# The relay is deliberately the smallest possible Worker: one file, no bindings,
+# no storage, no scheduled handler. It exists to change the host on a request.
+name = "saldo-openrouter-relay"
+main = "index.ts"
+compatibility_date = "2026-09-01"
+
+# RELAY_TOKEN is a secret, not a variable:
+#   npx wrangler secret put RELAY_TOKEN
+# Nothing else is configured. `workers_dev = true` keeps the free
+# <name>.<account>.workers.dev hostname; a custom domain is better on networks
+# that throttle the workers.dev zone, and needs no code change.
+workers_dev = true
