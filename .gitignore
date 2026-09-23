@@ -6,32 +6,12 @@ dist
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
-.refs/
-openrouter_free_logic/
-.playwright-mcp/
 *.log
+.playwright-mcp/
 
-# Local working notes: the assignment text and my own stack notes. The second
-# file contains a live API key, so it must never be tracked.
-TASK.md
-стек.txt
-
-# Reference material and scratch files: the single-file example the model
-# selection logic was compared against, raw responses pasted out of `curl`, and
-# the assistant's own working directory. None of it belongs in the repository.
-xample_fast.html
-probe*.json
+# The assistant's working directory. It holds session notes and throwaway
+# probes, so it stays local.
 .workbuddy-ai/
-
-# A pasted answer about running OpenRouter through a proxy - working notes, not
-# project material.
-rout.txt
-
-# A reference design page kept in the working directory while the second skin
-# was being built. It is somebody else's single-file page with its own .git, so
-# it must never be tracked here: committing it would either drag a nested
-# repository into the tree or copy the whole thing into this one.
-web_portfolio_27B_test/
 
 # Wrangler's local state (`worker/.wrangler/`) and the file it reads local
 # secrets from. Both are machine-specific, and `.dev.vars` holds a plaintext
