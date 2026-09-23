@@ -12,8 +12,16 @@ export interface StickToBottom {
 /**
  * Keeps the newest message in view while the model streams, but stops
  * hijacking the scroll as soon as the user scrolls up to read something.
+ *
+ * `enabled` is false while the dialog is blank. That is not a nicety: the empty
+ * state is centred in the scroll container by the stylesheet, and jumping to the
+ * bottom of a container that has nothing to scroll to pushes that centred block
+ * up under the header. On a short window - a phone with the keyboard open, a
+ * landscape laptop - the block is taller than the container, so the scroll is
+ * real and the heading ends up half off-screen the moment the page loads. With
+ * the flag off the log stays at the top, which is where `safe` centring put it.
  */
-export function useStickToBottom(dependency: unknown): StickToBottom {
+export function useStickToBottom(dependency: unknown, enabled = true): StickToBottom {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPinned, setIsPinned] = useState(true);
   const pinnedRef = useRef(true);
@@ -40,10 +48,20 @@ export function useStickToBottom(dependency: unknown): StickToBottom {
 
   useEffect(() => {
     const element = containerRef.current;
-    if (!element || !pinnedRef.current) return;
+    if (!element) return;
 
+    // A cleared dialog can still be scrolled from the previous conversation, so
+    // going blank means going back to the top rather than merely not scrolling.
+    if (!enabled) {
+      element.scrollTo({ top: 0 });
+      pinnedRef.current = true;
+      setIsPinned(true);
+      return;
+    }
+
+    if (!pinnedRef.current) return;
     element.scrollTo({ top: element.scrollHeight });
-  }, [dependency]);
+  }, [dependency, enabled]);
 
   return { containerRef, isPinned, onScroll: handleScroll, scrollToBottom };
 }

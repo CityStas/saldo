@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { DemoPanel } from './components/DemoPanel';
 import { EmptyState } from './components/EmptyState';
-import { ErrorNotice } from './components/ErrorMessage';
+import { ErrorNotice } from './components/ErrorNotice';
 import { MessageBubble } from './components/MessageBubble';
 import { MessageComposer } from './components/MessageComposer';
 import { TypingIndicator } from './components/TypingIndicator';
+import { useAnswerMode } from './hooks/useAnswerMode';
 import { useChat } from './hooks/useChat';
+import { useSkin } from './hooks/useSkin';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useTheme } from './hooks/useTheme';
 import { errorCopy } from './lib/errors';
-import { initialAnswerMode } from './lib/storage';
-import type { AnswerMode, ChatMessage } from './types/chat';
+import type { ChatMessage } from './types/chat';
 
 function statusFor(
   messages: ChatMessage[],
@@ -32,7 +33,7 @@ function statusFor(
 }
 
 export default function App() {
-  const [answerMode, setAnswerMode] = useState<AnswerMode>(initialAnswerMode);
+  const { mode: answerMode, setMode: setAnswerMode } = useAnswerMode();
 
   const {
     messages,
@@ -46,9 +47,8 @@ export default function App() {
     dismissError,
   } = useChat(answerMode);
 
-  const { theme, mode, setTheme, toggleMode } = useTheme();
-  const { containerRef, isPinned, onScroll, scrollToBottom } =
-    useStickToBottom(messages);
+  const { mode, toggleMode } = useTheme();
+  const { skin, setSkin } = useSkin();
 
   // Esc stops generation from anywhere on the page, including while the
   // textarea has focus - the assignment calls this out explicitly.
@@ -86,11 +86,32 @@ export default function App() {
     );
   }, [messages]);
 
+  // With nothing in the dialog the composer belongs inside the empty state,
+  // under the example questions, so it stays high on the page; once the
+  // conversation starts it moves to the bottom of the column where a chat input
+  // is expected to be.
+  const isBlank = visibleMessages.length === 0 && !isGenerating;
+
+  // `!isBlank` and not `true`: sticking to the bottom of an empty log scrolls
+  // the centred empty state up under the header. See the hook for the numbers.
+  const { containerRef, isPinned, onScroll, scrollToBottom } = useStickToBottom(
+    messages,
+    !isBlank,
+  );
+
   const errorCopyText = error ? errorCopy(error.code, error.retryAfterMs) : null;
 
   const liveStatus = errorCopyText
     ? `${errorCopyText.title}. ${errorCopyText.body}`
     : statusFor(messages, isGenerating, isFormulating);
+
+  const composer = (
+    <MessageComposer
+      isGenerating={isGenerating}
+      onSend={sendMessage}
+      onStop={stopGeneration}
+    />
+  );
 
   return (
     <div className="app">
@@ -99,10 +120,9 @@ export default function App() {
       </a>
 
       <AppHeader
-        theme={theme}
         mode={mode}
+        skin={skin}
         canClear={!isGenerating && messages.length > 0}
-        onThemeChange={setTheme}
         onToggleMode={toggleMode}
         onClear={clearChat}
       />
@@ -114,9 +134,10 @@ export default function App() {
           onScroll={onScroll}
           aria-label="История диалога"
           aria-busy={isGenerating}
+          data-blank={isBlank}
         >
-          {visibleMessages.length === 0 && !isGenerating ? (
-            <EmptyState onSuggestion={sendMessage} />
+          {isBlank ? (
+            <EmptyState onSuggestion={sendMessage} composer={composer} />
           ) : (
             <div className="chat__thread">
               {visibleMessages.map((message) => (
@@ -156,14 +177,15 @@ export default function App() {
           />
         ) : null}
 
-        <MessageComposer
-          isGenerating={isGenerating}
-          onSend={sendMessage}
-          onStop={stopGeneration}
-        />
+        {isBlank ? null : composer}
       </main>
 
-      <DemoPanel mode={answerMode} onModeChange={setAnswerMode} />
+      <DemoPanel
+        mode={answerMode}
+        skin={skin}
+        onModeChange={setAnswerMode}
+        onSkinChange={setSkin}
+      />
 
       {/*
         A dedicated live region. Putting aria-live on the message list itself

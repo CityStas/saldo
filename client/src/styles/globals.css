@@ -1,2 +1,7 @@
+/*
+ * Order matters: tokens, then the base app, then the alternative skin, which
+ * overrides both at the same specificity by coming last.
+ */
 @import './tokens.css';
 @import './app.css';
+@import './skin-portfolio.css';

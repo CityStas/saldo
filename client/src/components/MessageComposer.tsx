@@ -53,7 +53,7 @@ export function MessageComposer({ isGenerating, onSend, onStop }: Props) {
           className="composer__input"
           value={value}
           rows={1}
-          placeholder="Опишите задачу по учёту…"
+          placeholder="Опишите Амалии задачу..."
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => setValue(event.target.value)}

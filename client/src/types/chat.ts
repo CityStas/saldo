@@ -56,5 +56,8 @@ export interface DonePayload {
   attempts: number;
 }
 
-export type ThemeName = 'cream' | 'indigo' | 'mint';
+/** Brightness is the only theme axis: one palette, light and dark. */
 export type ThemeMode = 'light' | 'dark';
+
+/** Appearance. Two design systems, one React tree - see `lib/appearance.ts`. */
+export type SkinName = 'saldo' | 'portfolio';

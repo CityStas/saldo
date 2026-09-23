@@ -1,5 +1,16 @@
+import type { ReactNode } from 'react';
+
 interface Props {
   onSuggestion: (value: string) => void;
+  /**
+   * The message composer, passed in rather than rendered by the layout, so that
+   * on an empty dialog it can sit right under the example questions instead of
+   * at the bottom of the column. The examples read as a menu of what to ask,
+   * and the field closes the list - the same order a person scans the screen in.
+   * It stays high on the page: the whole block is anchored near the top, not
+   * pushed to the bottom edge where a chat input normally waits.
+   */
+  composer?: ReactNode;
 }
 
 const SUGGESTIONS = [
@@ -9,19 +20,15 @@ const SUGGESTIONS = [
   'Можно ли исправить учёт за прошлый период?',
 ];
 
-export function EmptyState({ onSuggestion }: Props) {
+export function EmptyState({ onSuggestion, composer }: Props) {
   return (
     <div className="empty">
-      <div className="empty__mark" aria-hidden="true">
-        <svg viewBox="0 0 44 44" width="44" height="44" role="presentation">
-          <circle cx="22" cy="22" r="21" fill="none" stroke="currentColor" strokeOpacity="0.25" />
-          <path
-            d="M22 11c1.1 6.1 3.8 8.9 10 10-6.2 1.1-8.9 3.9-10 10-1.1-6.1-3.8-8.9-10-10 6.2-1.1 8.9-3.9 10-10Z"
-            fill="currentColor"
-          />
-        </svg>
-      </div>
-
+      {/*
+        One large statement and nothing above it. The mono line naming the
+        service used to sit here, and before that a decorative glyph: on a first
+        screen with nothing in it, every line before the heading is one more
+        thing to read before the thing that matters.
+      */}
       <h2 className="empty__title">
         С чего <em>начать</em>?
       </h2>
@@ -44,6 +51,8 @@ export function EmptyState({ onSuggestion }: Props) {
           </li>
         ))}
       </ul>
+
+      {composer ? <div className="empty__composer">{composer}</div> : null}
     </div>
   );
 }

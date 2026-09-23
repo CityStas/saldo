@@ -1,12 +1,8 @@
-import type {
-  AnswerMode,
-  ChatMessage,
-  ThemeMode,
-  ThemeName,
-} from '../types/chat';
+import type { AnswerMode, ChatMessage, SkinName, ThemeMode } from '../types/chat';
 
 const HISTORY_KEY = 'saldo-chat:history:v1';
 const THEME_KEY = 'saldo-chat:theme:v1';
+const SKIN_KEY = 'saldo-chat:skin:v1';
 const ANSWER_MODE_KEY = 'saldo-chat:answer-mode:v1';
 const MAX_STORED_MESSAGES = 60;
 
@@ -59,31 +55,51 @@ export function clearStoredHistory(): void {
   }
 }
 
-export interface StoredTheme {
-  name: ThemeName;
-  mode: ThemeMode;
-}
-
-export function loadTheme(): StoredTheme | null {
+export function loadTheme(): ThemeMode | null {
   try {
     const raw = localStorage.getItem(THEME_KEY);
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as Partial<StoredTheme>;
-    const names: ThemeName[] = ['cream', 'indigo', 'mint'];
+    const parsed = JSON.parse(raw) as unknown;
 
-    if (!parsed.name || !names.includes(parsed.name)) return null;
-    if (parsed.mode !== 'light' && parsed.mode !== 'dark') return null;
+    // The stored shape used to be `{ name, mode }` with a palette alongside the
+    // brightness. Only the brightness is left, and the old records still parse:
+    // whatever is in there, the mode field is what this reads.
+    const mode =
+      typeof parsed === 'string'
+        ? parsed
+        : ((parsed as { mode?: unknown } | null)?.mode ?? null);
 
-    return { name: parsed.name, mode: parsed.mode };
+    return mode === 'light' || mode === 'dark' ? mode : null;
   } catch {
     return null;
   }
 }
 
-export function saveTheme(theme: StoredTheme): void {
+export function saveTheme(mode: ThemeMode): void {
   try {
-    localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+    localStorage.setItem(THEME_KEY, JSON.stringify({ mode }));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Appearance is a viewing preference like the theme, not part of the dialog:
+ * it survives a reload on its own key and never touches the conversation.
+ */
+export function loadSkin(): SkinName | null {
+  try {
+    const raw = localStorage.getItem(SKIN_KEY);
+    return raw === 'saldo' || raw === 'portfolio' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSkin(skin: SkinName): void {
+  try {
+    localStorage.setItem(SKIN_KEY, skin);
   } catch {
     // ignore
   }
@@ -93,9 +109,9 @@ export function saveTheme(theme: StoredTheme): void {
  * The demo panel's mode is a viewing preference, not part of the dialog, so it
  * survives a reload on its own key and does not touch the conversation.
  */
-export const DEFAULT_ANSWER_MODE: AnswerMode = 'consult';
+const DEFAULT_ANSWER_MODE: AnswerMode = 'consult';
 
-export function loadAnswerMode(): AnswerMode | null {
+function loadAnswerMode(): AnswerMode | null {
   try {
     const raw = localStorage.getItem(ANSWER_MODE_KEY);
     return raw === 'consult' || raw === 'full' ? raw : null;

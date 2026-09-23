@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-theme="cream" data-mode="light">
+<html lang="ru" data-mode="light" data-skin="saldo">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,27 +7,66 @@
       name="description"
       content="Чат с Амалией, бухгалтером-консультантом сервиса САЛЬДО: расходы, первичные документы и учёт входящего НДС."
     />
-    <meta name="color-scheme" content="light" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>чат с Амалией</title>
+    <meta name="color-scheme" content="light dark" />
+    <!--
+      The same icon set the main site serves, so a tab with the chat open is
+      indistinguishable from a tab with saldo.chat open. Ordered exactly as in
+      the site's <head>: the .ico for anything that wants it, a 32px PNG for
+      modern browsers, and the touch icon for iOS home screens.
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>САЛЬДО | чат с Амалией</title>
 
+    <!--
+      Inter carries the interface in both appearances. Playfair Display is the
+      display serif of the second one (`data-skin="portfolio"`); it is fetched
+      on every load rather than lazily, because a skin switch should not wait on
+      a network round-trip. Weight 300 is Inter's light, which is what the
+      portfolio design sets its body text in.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap"
     />
 
     <script>
-      // Palette and brightness are pinned to the scheme of the main site while
-      // the picker is hidden (see client/src/lib/theme.ts). Still inline and
-      // before first paint, so nothing flashes; when the picker comes back,
-      // restore the localStorage lookup and the prefers-color-scheme fallback
-      // here, and set the meta tag above back to "light dark".
+      /*
+       * Brightness and appearance are applied before the first paint, straight
+       * from localStorage, so a stored dark theme or the second skin does not
+       * flash the other design on reload. This has to stay a classic inline
+       * script and it has to stay above the stylesheet-independent markup:
+       * React would run far too late.
+       *
+       * The defaults are the main site's light scheme and the product's own
+       * appearance, matching useTheme() and useSkin(). The keys and the shape
+       * of the values must stay in sync with client/src/lib/storage.ts
+       * (`saldo-chat:theme:v1`, { mode }; `saldo-chat:skin:v1`, a string).
+       */
       (function () {
-        document.documentElement.dataset.theme = 'cream';
-        document.documentElement.dataset.mode = 'light';
-        document.documentElement.style.colorScheme = 'light';
+        var mode = 'light';
+        var skin = 'saldo';
+
+        try {
+          var stored = JSON.parse(localStorage.getItem('saldo-chat:theme:v1'));
+          if (stored && (stored.mode === 'light' || stored.mode === 'dark')) {
+            mode = stored.mode;
+          }
+
+          var storedSkin = localStorage.getItem('saldo-chat:skin:v1');
+          if (storedSkin === 'saldo' || storedSkin === 'portfolio') {
+            skin = storedSkin;
+          }
+        } catch (error) {
+          /* private mode or corrupted value: the defaults stand */
+        }
+
+        document.documentElement.dataset.mode = mode;
+        document.documentElement.dataset.skin = skin;
+        document.documentElement.style.colorScheme = mode;
       })();
     </script>
   </head>

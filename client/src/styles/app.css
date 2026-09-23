@@ -98,22 +98,61 @@ button {
 
 /* --------------------------------------------------------------- shell --- */
 
+/*
+ * No top padding: the site's header is the first thing on the page and is 72px
+ * tall, so the chat's header is too. Matching it means the wordmark sits at the
+ * same height on both pages, not just the same x.
+ *
+ * `height` and not `min-height`, and that distinction is the whole layout. With
+ * an indefinite height the two `1fr` rows below - this one and the log's inside
+ * `.chat` - are resolved against their content instead of the free space, so the
+ * shell simply grows: measured on a 360x320 window, sixteen short messages took
+ * the document to 1528px of scroll and the composer went with them, off the
+ * bottom of the screen. The log never scrolled, so the auto-scroll to the newest
+ * message had nothing to scroll and the answer arrived out of sight.
+ *
+ * With a definite 100dvh the log gets the leftover space and scrolls inside it,
+ * the composer stays put, and the page itself never scrolls. `dvh` rather than
+ * `vh` because the mobile address bar changes the viewport as it hides.
+ */
 .app {
   display: grid;
   grid-template-rows: auto 1fr;
   width: min(var(--shell-width), 100%);
-  min-height: 100dvh;
+  /* `vh` first for browsers without `dvh` (Safari before 15.4). */
+  height: 100vh;
+  height: 100dvh;
   margin: 0 auto;
-  padding: 16px 20px 18px;
+  padding: 0 var(--shell-pad) 18px;
 }
 
+/*
+ * The bar is sized around the controls, not the other way round: the Telegram
+ * pill is 44px and the wordmark 32px, both taken from saldo.chat, so 14px of
+ * padding above and below lands the header on the site's 72px - measured from
+ * y=0, because the site's header is not inset from the top of the page.
+ */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-4);
-  padding: 6px 2px 16px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border);
+  /*
+   * `min-width: 0` is what lets the bar shrink on a narrow phone. The header is
+   * a grid item of `.app`, and a grid item defaults to `min-width: auto`, whose
+   * automatic minimum is the item's min-content size - and the min-content size
+   * of this row is 337.7px, because the wordmark is 142.2px, the two round
+   * controls 76px and the title, being `white-space: nowrap`, refuses to
+   * contribute less than its full 104.5px. That number became the width of the
+   * whole grid track, so at 360px the document scrolled 2px sideways and at
+   * 320px it scrolled 42px, with the Telegram circle off the edge.
+   *
+   * Zeroing the floor hands the decision to the flex algorithm inside, where
+   * the brand can give way and the title can ellipsise.
+   */
+  min-width: 0;
 }
 
 .header__brand {
@@ -121,6 +160,25 @@ button {
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+
+/*
+ * The wordmark links to the main site. The anchor is `inline-flex` rather than
+ * an inline box so the 32px mark does not sit on a text baseline and add a few
+ * pixels of leading under a header that is meant to be exactly 72px.
+ */
+.header__logo-link {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: opacity 0.16s var(--ease);
+}
+
+.header__logo-link:hover {
+  opacity: 0.78;
 }
 
 .header__logo {
@@ -131,12 +189,12 @@ button {
 
 .header__divider {
   width: 1px;
-  height: 26px;
+  height: 30px;
   background: var(--border-strong);
 }
 
 .header__title {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 500;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -193,6 +251,11 @@ button {
  * at roughly 0.3 of the height and the side padding at roughly 0.44. `sm` is
  * scaled down to line up with the 34px controls in the header; `md` is the
  * hero size used inside an answer.
+ *
+ * Weight is 600 where the site sets 500. That is a deliberate departure: at 14px
+ * on a near-black pill the site's own 500 reads thin next to the wordmark, and
+ * the request was for the label to be white and a touch heavier. Everything
+ * else - 44px, 20px of side padding, a 17px icon, fully rounded - is the site's.
  */
 .tg-button {
   display: inline-flex;
@@ -202,7 +265,7 @@ button {
   border-radius: var(--radius-pill);
   background: var(--cta-bg);
   color: var(--cta-fg);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   text-decoration: none;
@@ -219,11 +282,6 @@ button {
 
 .tg-button__icon {
   flex: none;
-}
-
-/* Only one of the two labels is visible, depending on the breakpoint. */
-.tg-button__label--short {
-  display: none;
 }
 
 .tg-button__arrow {
@@ -300,112 +358,11 @@ button {
   color: var(--muted);
 }
 
-/* --------------------------------------------------------- theme switch --- */
-
-.theme-bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-}
-
-.theme-bar__swatches {
-  display: flex;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-
-.theme-bar__divider {
-  width: 1px;
-  height: 18px;
-  margin: 0 3px;
-  background: var(--border);
-}
-
-.theme-bar__mode {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-pill);
-  color: var(--muted);
-}
-
-.theme-bar__mode:hover {
-  color: var(--text);
-  background: var(--bg-alt);
-}
-
-.swatch {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-pill);
-  background: var(--swatch-bg);
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-  transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease);
-}
-
-.swatch:hover {
-  transform: scale(1.06);
-}
-
-/* The radio itself is visually hidden, so the ring goes on the swatch. */
-.swatch:has(input:checked) {
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.12),
-    0 0 0 2px var(--bg),
-    0 0 0 4px var(--accent);
-}
-
-.swatch:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-}
-
-.swatch__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-pill);
-  background: var(--swatch-accent);
-}
-
-/* Swatches preview each palette, so their colours are literal, not themed. */
-.swatch[data-swatch='cream'] {
-  --swatch-bg: #f5ede0;
-  --swatch-accent: #e8924a;
-}
-
-.swatch[data-swatch='indigo'] {
-  --swatch-bg: #f4f4f9;
-  --swatch-accent: #7c3aed;
-}
-
-.swatch[data-swatch='mint'] {
-  --swatch-bg: #f1f7f4;
-  --swatch-accent: #0f9b6c;
-}
-
-:root[data-mode='dark'] .swatch[data-swatch='cream'] {
-  --swatch-bg: #1e1e2e;
-}
-
-:root[data-mode='dark'] .swatch[data-swatch='indigo'] {
-  --swatch-bg: #121220;
-}
-
-:root[data-mode='dark'] .swatch[data-swatch='mint'] {
-  --swatch-bg: #0e1a16;
-}
+/*
+ * The theme toggle is a plain icon button, the same one the clear action uses.
+ * It used to be a pill holding three palette swatches and a day/night button;
+ * with one palette left there is nothing to choose but the brightness.
+ */
 
 /* ---------------------------------------------------------------- chat --- */
 
@@ -415,6 +372,20 @@ button {
   grid-template-rows: 1fr auto auto;
   gap: var(--gap-3);
   min-height: 0;
+}
+
+/*
+ * The shell is as wide as the site's container, but text is not: everything
+ * that carries words - the thread, the field, the error notice - is held to the
+ * reading column and centred, so the header can match the site without the
+ * answers turning into 1100px lines.
+ */
+.chat__thread,
+.chat > .composer,
+.chat > .notice {
+  width: 100%;
+  max-width: var(--column-width);
+  margin-inline: auto;
 }
 
 .chat__log {
@@ -533,25 +504,40 @@ button {
   margin: 0 0 0.75em;
 }
 
-.markdown h1,
-.markdown h2,
-.markdown h3 {
+/*
+ * Visual scale is keyed off the level the model wrote (`md-h1`..`md-h6`), not
+ * off the tag it ended up as: the tag is chosen for the page's heading order
+ * in Markdown.tsx, and a `###` from the model may well be rendered as an `h2`.
+ * Sizes stay tied to the intent, semantics stay tied to the document.
+ */
+.markdown .md-h1,
+.markdown .md-h2,
+.markdown .md-h3,
+.markdown .md-h4,
+.markdown .md-h5,
+.markdown .md-h6 {
   margin: 1.1em 0 0.5em;
   font-weight: 650;
   letter-spacing: -0.01em;
   line-height: 1.3;
 }
 
-.markdown h1 {
+.markdown .md-h1 {
   font-size: 1.3em;
 }
 
-.markdown h2 {
+.markdown .md-h2 {
   font-size: 1.15em;
 }
 
-.markdown h3 {
+.markdown .md-h3 {
   font-size: 1.02em;
+}
+
+.markdown .md-h4,
+.markdown .md-h5,
+.markdown .md-h6 {
+  font-size: 1em;
 }
 
 .markdown ul,
@@ -697,37 +683,73 @@ button {
 
 /* --------------------------------------------------------- empty state --- */
 
+/*
+ * Anchored in the middle of the column, not at its top and not at the bottom.
+ * The composer lives inside this block on a blank dialog, so the group is the
+ * whole screen: pushing it against the header put the heading right under the
+ * menu, and pushing it down left a hole above. `safe` is what keeps a short
+ * window honest - if the block does not fit, centring would cut off its top and
+ * there would be no way to scroll to it, so it falls back to the start.
+ *
+ * The block is wider than its text on purpose. The heading and the prompt are
+ * capped below, the example questions keep their own 620px column, and the
+ * field takes the full width - a narrower input here than the one the dialog
+ * shows after the first message would be a step backwards for the main action
+ * on the screen.
+ */
+.chat__log[data-blank='true'] {
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  padding-top: 20px;
+  padding-bottom: 24px;
+}
+
 .empty {
-  max-width: 620px;
-  margin: 7vh auto 0;
+  width: 100%;
+  max-width: var(--column-width);
+  margin: 0 auto;
   text-align: center;
 }
 
-.empty__mark {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 20px;
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  color: var(--accent);
-}
-
+/*
+ * The site's h1 numbers as closely as a narrower column allows: 58px is the
+ * site's size, the cap scales it down on small screens, and -0.035em is its
+ * measured letter-spacing (-2.03px at 58px).
+ */
 .empty__title {
-  font-size: clamp(30px, 6vw, 44px);
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-size: clamp(30px, 8vw, 58px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
 }
 
+/*
+ * Weight is set explicitly rather than inherited: the site's accent word takes
+ * its heading's 700, and this rule used to force 400, which made the accent
+ * read as the lightest word inside a bold heading.
+ *
+ * The size bump is measured, not taste - see `--accent-word-scale`. It is a
+ * token rather than a number here because it depends on which face the *rest*
+ * of the heading is set in, and the second skin sets the whole heading in the
+ * serif, where the correction has to be 1.
+ */
 .empty__title em {
   font-family: var(--font-serif);
   font-style: italic;
-  font-weight: 400;
+  font-weight: 700;
+  font-size: var(--accent-word-scale);
   color: var(--accent);
+}
+
+/*
+ * The composer closes the empty state, under the example questions. It sits in
+ * a centred block while its own contents are not, hence `text-align: left`;
+ * `margin-top` is the gap between the last row of chips and the field.
+ */
+.empty__composer {
+  margin: 20px 0 0;
+  text-align: left;
 }
 
 .empty__lead {
@@ -740,6 +762,8 @@ button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  max-width: 620px;
+  margin: 0 auto;
   padding: 0;
   list-style: none;
 }
@@ -906,13 +930,19 @@ button {
   background: var(--surface);
 }
 
+/*
+ * The caption under the field is deliberately quieter than body text: it is a
+ * reminder for someone who already knows the app, not something to read on the
+ * first visit, so it is scaled 1.2x down from the smallest text token. The key
+ * caps follow it, or they would end up bigger than the words they sit next to.
+ */
 .composer__hints {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 0 6px;
-  font-size: var(--text-xs);
+  font-size: calc(var(--text-xs) / 1.2);
   color: var(--muted);
 }
 
@@ -929,7 +959,7 @@ kbd {
   border-radius: 5px;
   background: var(--surface);
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: calc(10.5px / 1.2);
   color: var(--muted);
 }
 
@@ -1079,6 +1109,25 @@ kbd {
   min-width: 0;
 }
 
+/*
+ * A visible legend per group. The panel now holds two independent choices -
+ * appearance and answer mode - and two unlabelled stacks of radios in one
+ * column read as a single list of four.
+ */
+.demo__legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.demo__options + .demo__options {
+  margin-top: 12px;
+}
+
 .demo__option {
   display: flex;
   flex-direction: column;
@@ -1129,46 +1178,86 @@ kbd {
 
 @media (max-width: 680px) {
   .app {
-    padding: 12px 12px 14px;
+    padding: 0 24px 14px;
   }
 
+  /*
+   * One row on a phone, not two. Measured at 390px: the wordmark is 142px, the
+   * two round controls 78px together, and the title took the rest - which came
+   * to 372px against 342px of room, so it wrapped. What pays for the row:
+   *
+   * - the divider goes. It separates the wordmark from the title, and on a
+   *   narrow screen the gap already does that;
+   * - the title drops to 13px and its accent word from 1.5em to 1.3em, which is
+   *   the difference between 133px and about 105px;
+   * - the gaps tighten from 16/9px to 8/7px.
+   *
+   * `min-width: 0` plus ellipsis is the safety net: on a 320px screen the title
+   * gives way instead of pushing the controls off the edge.
+   */
   .header {
-    flex-wrap: wrap;
-    align-items: center;
-    row-gap: 10px;
+    flex-wrap: nowrap;
+    gap: 8px;
     padding-bottom: 12px;
   }
 
   .header__brand {
-    gap: 9px;
-  }
-
-  .header__logo {
-    height: 22px;
-    width: auto;
+    gap: 7px;
   }
 
   .header__divider {
-    height: 20px;
-  }
-
-  .header__title {
-    font-size: var(--text-sm);
-  }
-
-  /* The controls move to their own row: a 34px pill plus the theme bar plus
-     the clear button do not fit next to the wordmark on a phone. */
-  .header__actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .tg-button__label {
     display: none;
   }
 
-  .tg-button__label--short {
-    display: inline;
+  .header__title {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header__title em {
+    font-size: 1.3em;
+  }
+
+  /*
+   * The controls are pushed to the right edge, so the two circles sit at the
+   * end of the row, level with the title.
+   */
+  .header__actions {
+    width: auto;
+    flex: none;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /*
+   * On a phone the header's Telegram button becomes a circle with the icon and
+   * no text at all - the same 34px as the brightness toggle next to it, so the
+   * two read as one pair of controls. Not even the short "Telegram" label: a
+   * word next to an icon that already says Telegram is the first thing that can
+   * go when the row has to fit.
+   *
+   * The accessible name does not go with it - it comes from `aria-label` on the
+   * link, so a screen reader still hears "Написать в Telegram". Only the visual
+   * label is dropped.
+   *
+   * Scoped to the header on purpose: the button inside an answer keeps its
+   * wording ("Проверить документы"), because there the label is the offer.
+   */
+  .header__actions .tg-button {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    gap: 0;
+  }
+
+  .header__actions .tg-button__icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .header__actions .tg-button__label {
+    display: none;
   }
 
   /* On a phone the panel would cover the conversation, so it drops to the
@@ -1195,8 +1284,13 @@ kbd {
     max-width: 100%;
   }
 
-  .empty {
-    margin-top: 5vh;
+  /*
+   * On a phone the empty state is tall - four questions in one column plus the
+   * field - so it gets a guaranteed gap under the header. `safe` centring still
+   * does its job when the screen is tall enough for the block to fit.
+   */
+  .chat__log[data-blank='true'] {
+    padding-top: 26px;
   }
 
   .empty__suggestions {
@@ -1209,5 +1303,48 @@ kbd {
 
   .to-bottom {
     bottom: 104px;
+  }
+}
+
+/*
+ * The last 40 pixels of the phone range. Below 400px the row no longer has room
+ * for a 142px wordmark and a 13px title side by side, so both step down: the
+ * mark to 26px tall (115.6px wide, the same 160:36 ratio) and the title to 12px.
+ * Measured at 360px that leaves the title 96.5px against 228px of room, so it
+ * still reads in full - the ellipsis below is a safety net, not the plan.
+ */
+@media (max-width: 400px) {
+  .header__logo {
+    height: 26px;
+    width: 115.6px;
+  }
+
+  .header__title {
+    font-size: 12px;
+  }
+}
+
+/*
+ * At 320px there is genuinely no room for the title: the two controls are 76px,
+ * the wordmark 115.6px and the gaps 15px, which leaves 65px of 272 - enough for
+ * "чат с Ама…". A clipped product name is worse than no product name, and the
+ * wordmark right next to it already says which service this is, so the heading
+ * steps out of the visual row at this width.
+ *
+ * It is not removed: the same box is taken out of flow instead of hidden, so the
+ * `h1` stays in the accessibility tree and the document keeps exactly one
+ * heading. This is the `sr-only` treatment applied to a single element.
+ */
+@media (max-width: 340px) {
+  .header__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    border: 0;
+    clip-path: inset(50%);
   }
 }

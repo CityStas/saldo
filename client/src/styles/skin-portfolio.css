@@ -1,0 +1,541 @@
+/*
+ * Skin: «Портфолио».
+ *
+ * The chat's second appearance, taken from a personal portfolio page
+ * (`web_portfolio_27B_test/index.html` in the repository root): near-black
+ * paper, hairline rules instead of borders and shadows, Playfair Display
+ * headings, wide-tracked Courier labels, square corners everywhere, and a pale
+ * sand accent used sparingly - for the one primary action, for the selected
+ * state, and for the italic word inside a heading.
+ *
+ * This file is the whole skin. Nothing in `app.css` knows it exists, no
+ * component branches on it, and the React tree is byte-for-byte the same in
+ * both appearances - only `data-skin` on <html> differs. That is the point: if
+ * a second design system can be carried by one stylesheet, then the components
+ * were built on tokens rather than on opinions.
+ *
+ * The rules below are deliberately written against the *components*, not
+ * against the tokens alone: the token layer cannot express "no shadows",
+ * "uppercase monospace labels" or "the serif is a display face at weight 400".
+ */
+
+/* ------------------------------------------------------------- tokens --- */
+
+:root[data-skin='portfolio'] {
+  /* Paper: page, raised surfaces, hairlines. */
+  --bg: #0e0e0e;
+  --bg-alt: #161616;
+  --surface: #161616;
+  --surface-2: #1b1b1b;
+  --text: #e8e8e8;
+  --muted: #8a8a8a;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+
+  /* The accent is a pale sand, not a brand colour: it marks, it does not shout. */
+  --accent: #d4c4a0;
+  --accent-ink: #d4c4a0;
+  --accent-soft: rgba(212, 196, 160, 0.1);
+  --on-accent: #0e0e0e;
+
+  --bubble-user-bg: #d4c4a0;
+  --bubble-user-text: #0e0e0e;
+
+  --danger: #d98c82;
+  --danger-bg: rgba(217, 140, 130, 0.12);
+  --code-bg: #101010;
+
+  /* No cards floating over paper: the design separates with lines. */
+  --shadow-card: none;
+  --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.65);
+  --backdrop: none;
+
+  /* The Telegram pill becomes an outlined button, so it needs its own line. */
+  --cta-bg: transparent;
+  --cta-fg: #d4c4a0;
+  --cta-line: #d4c4a0;
+
+  /* Square. Everything square - this is the loudest single decision in the
+     reference design and the first thing that reads as "another system". */
+  --radius-sm: 0;
+  --radius: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-pill: 0;
+
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-mono: 'Courier New', monospace;
+
+  /*
+   * The reference lays out at 5vw of padding with no max width, so it breathes
+   * far more than a product shell. The container is the same one the main site
+   * uses, but the reading column inside it is wider than in the first skin -
+   * this design is airier, and a narrow column in it reads as a mistake.
+   */
+  --column-width: 940px;
+
+  /*
+   * The accent word needs a smaller correction here, and for a different
+   * reason: this heading is already the serif, so the sans/serif mismatch of
+   * the first skin does not apply. What is left is the italic - Playfair's
+   * italic has a lower x-height than its roman, 49/100em against 52/100em, so
+   * at the same size the italic word still reads a touch small. 52/49 = 1.06.
+   *
+   * This number was 1 for one commit, which made "начать" 12% *larger* than
+   * "С чего" - the first skin's correction, applied where it does not belong.
+   * Both values are measured; neither is a guess.
+   *
+   * `1.06em`, not `1.06`: a unitless value is not a valid `font-size`, and the
+   * browser drops the declaration instead of applying it.
+   */
+  --accent-word-scale: 1.06em;
+}
+
+/* --------------------------------------------------------------- page --- */
+
+/*
+ * Weight 300 for body text and a slightly looser leading: the reference sets
+ * light Inter on black, where 400 reads as heavy.
+ */
+:root[data-skin='portfolio'] body {
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+:root[data-skin='portfolio'] ::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/*
+ * The hero grid from the reference, behind the first screen only. It is the one
+ * purely decorative element in this skin, and it is what makes the empty state
+ * look composed rather than empty.
+ *
+ * It bleeds past the block on purpose, which means it also bleeds past the
+ * scroll container and produces a horizontal scrollbar - hence the clipped
+ * overflow-x below. `overflow-x: hidden` with `overflow-y: auto` clips the
+ * decoration without touching vertical scrolling.
+ */
+:root[data-skin='portfolio'] .chat__log {
+  overflow-x: hidden;
+}
+
+:root[data-skin='portfolio'] .empty {
+  position: relative;
+}
+
+:root[data-skin='portfolio'] .empty::before {
+  content: '';
+  position: absolute;
+  inset: -40px -60px;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 80px 80px;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* On a phone the block is nearly the width of the screen, so the grid stops
+   bleeding sideways instead of being clipped by the scroll container. */
+@media (max-width: 680px) {
+  :root[data-skin='portfolio'] .empty::before {
+    inset: -24px 0;
+    background-size: 48px 48px;
+  }
+}
+
+/* ------------------------------------------------------------- header --- */
+
+/*
+ * The reference header is a monospace wordmark and a monospace nav, both
+ * uppercase with wide tracking. The chat's header keeps its structure (brand,
+ * divider, title, actions) and changes only its voice.
+ */
+:root[data-skin='portfolio'] .header {
+  border-bottom-color: var(--border);
+}
+
+:root[data-skin='portfolio'] .header__logo {
+  color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .header__divider {
+  height: 22px;
+  background: var(--border);
+}
+
+:root[data-skin='portfolio'] .header__title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+:root[data-skin='portfolio'] .header__title em {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 1em;
+  color: var(--accent);
+}
+
+/* The primary action: outlined square that fills with the accent on hover. */
+:root[data-skin='portfolio'] .tg-button {
+  border: 1px solid var(--cta-line);
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  transition: background-color 0.4s var(--ease), color 0.4s var(--ease);
+}
+
+:root[data-skin='portfolio'] .tg-button:hover {
+  opacity: 1;
+  background: var(--accent);
+  color: var(--bg);
+}
+
+:root[data-skin='portfolio'] .tg-button:hover .tg-button__arrow {
+  transform: none;
+}
+
+:root[data-skin='portfolio'] .icon-button {
+  border-radius: 0;
+  background: transparent;
+  border-color: var(--border);
+}
+
+:root[data-skin='portfolio'] .icon-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* -------------------------------------------------------- empty state --- */
+
+/*
+ * Playfair at weight 400, not 700: the reference never sets a bold serif, and
+ * the size does the work instead. The accent word stays italic and keeps the
+ * measured 1.12 ratio from app.css - Playfair's italic x-height is 49/100em,
+ * the same as Georgia's, so the correction holds in both skins.
+ */
+:root[data-skin='portfolio'] .empty__title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(36px, 6vw, 76px);
+  letter-spacing: -0.01em;
+  line-height: 1.08;
+}
+
+:root[data-skin='portfolio'] .empty__title em {
+  font-weight: 400;
+}
+
+:root[data-skin='portfolio'] .empty__lead {
+  max-width: 560px;
+  font-weight: 300;
+  line-height: 1.7;
+}
+
+/*
+ * The example questions read as the reference's ghost buttons: hairline border,
+ * muted label, no fill until hover. Uppercase monospace would be more faithful
+ * to the tags in the reference, but these are whole questions, and a sentence
+ * in wide-tracked caps is a legibility tax with nothing bought in return.
+ */
+:root[data-skin='portfolio'] .empty__suggestions {
+  max-width: 720px;
+}
+
+:root[data-skin='portfolio'] .chip {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 300;
+  padding: 12px 16px;
+  transition: border-color 0.35s var(--ease), color 0.35s var(--ease);
+}
+
+:root[data-skin='portfolio'] .chip:hover {
+  border-color: var(--muted);
+  background: transparent;
+  color: var(--text);
+  transform: none;
+}
+
+/* ----------------------------------------------------------- composer --- */
+
+:root[data-skin='portfolio'] .composer__field {
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
+  padding: 10px 10px 10px 16px;
+}
+
+:root[data-skin='portfolio'] .composer__field:focus-within {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+:root[data-skin='portfolio'] .composer__input::placeholder {
+  font-weight: 300;
+}
+
+/* The send arrow is the one solid accent surface in the whole skin. */
+:root[data-skin='portfolio'] .button--send,
+:root[data-skin='portfolio'] .button--stop {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] .button--send {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+:root[data-skin='portfolio'] .button--send:hover:not(:disabled) {
+  background: var(--text);
+  color: var(--bg);
+}
+
+:root[data-skin='portfolio'] .composer__hints {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] kbd {
+  border-radius: 0;
+  border-color: var(--border);
+  background: transparent;
+  font-family: var(--font-mono);
+}
+
+/* ----------------------------------------------------------- messages --- */
+
+:root[data-skin='portfolio'] .message__bubble {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+:root[data-skin='portfolio'] .message[data-role='user'] .message__bubble {
+  border-color: transparent;
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
+}
+
+:root[data-skin='portfolio'] .message__meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] .message__caret {
+  border-radius: 0;
+}
+
+/* Answers are set in the sans face at weight 300, like the reference body. */
+:root[data-skin='portfolio'] .markdown {
+  font-weight: 300;
+  line-height: 1.7;
+}
+
+/*
+ * Headings inside an answer take the display serif, at the reference's 400.
+ * The `md-h*` scale from app.css still decides the size.
+ */
+:root[data-skin='portfolio'] .markdown .md-h1,
+:root[data-skin='portfolio'] .markdown .md-h2,
+:root[data-skin='portfolio'] .markdown .md-h3,
+:root[data-skin='portfolio'] .markdown .md-h4,
+:root[data-skin='portfolio'] .markdown .md-h5,
+:root[data-skin='portfolio'] .markdown .md-h6 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+:root[data-skin='portfolio'] .markdown strong {
+  font-weight: 500;
+  color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .markdown :not(pre) > code,
+:root[data-skin='portfolio'] .inline-code {
+  border-radius: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+:root[data-skin='portfolio'] .markdown th,
+:root[data-skin='portfolio'] .markdown td {
+  border-color: var(--border);
+}
+
+:root[data-skin='portfolio'] .markdown th {
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+:root[data-skin='portfolio'] .markdown blockquote {
+  border-left-color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .code {
+  border-radius: 0;
+  border-color: var(--border);
+}
+
+:root[data-skin='portfolio'] .code__lang {
+  font-family: var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] .code__copy {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------ service card --- */
+
+:root[data-skin='portfolio'] .service-cta {
+  border-radius: 0;
+  border-color: var(--border);
+  background: transparent;
+}
+
+:root[data-skin='portfolio'] .service-cta__kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+  color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .service-cta__title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* ------------------------------------------------------------- notice --- */
+
+:root[data-skin='portfolio'] .notice {
+  border-radius: 0;
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+:root[data-skin='portfolio'] .notice__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------- demo panel --- */
+
+:root[data-skin='portfolio'] .demo__toggle,
+:root[data-skin='portfolio'] .demo__close {
+  border-radius: 0;
+  border-color: var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] .demo__toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .demo__panel {
+  border-radius: 0;
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+:root[data-skin='portfolio'] .demo__title,
+:root[data-skin='portfolio'] .demo__legend {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+:root[data-skin='portfolio'] .demo__option {
+  border-radius: 0;
+  border-color: var(--border);
+  background: transparent;
+}
+
+:root[data-skin='portfolio'] .demo__option[data-active='true'] {
+  border-color: var(--accent);
+  background: transparent;
+}
+
+:root[data-skin='portfolio'] .demo__option-title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+:root[data-skin='portfolio'] .demo__option[data-active='true'] .demo__option-title {
+  color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .demo__option-text {
+  font-weight: 300;
+}
+
+/* ------------------------------------------------------------- misc ---- */
+
+:root[data-skin='portfolio'] .to-bottom {
+  border-radius: 0;
+  border-color: var(--border);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] .to-bottom:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:root[data-skin='portfolio'] .typing__label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+:root[data-skin='portfolio'] .typing__dots i {
+  border-radius: 0;
+}

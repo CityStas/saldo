@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
-import { saveAnswerMode } from '../lib/storage';
-import type { AnswerMode } from '../types/chat';
+import { SKINS } from '../lib/appearance';
+import type { AnswerMode, SkinName } from '../types/chat';
 
 interface Props {
   mode: AnswerMode;
+  skin: SkinName;
   onModeChange: (mode: AnswerMode) => void;
+  onSkinChange: (skin: SkinName) => void;
 }
 
 const MODES: { value: AnswerMode; title: string; text: string }[] = [
@@ -24,23 +26,49 @@ const MODES: { value: AnswerMode; title: string; text: string }[] = [
 /**
  * The demo switch, floating on the side of the page.
  *
- * It exists because the two modes answer the same question differently, and a
- * reviewer should be able to compare them on the spot instead of reading about
- * the difference. The choice is applied to the next message, not to the ones
- * already in the dialog.
+ * Two independent things a reviewer should be able to compare on the spot
+ * instead of reading about: how the assistant answers (with a service offer or
+ * without), and how the chat looks (the product's design or the portfolio's).
+ * Both choices are applied to what comes next, never retroactively.
  */
-export function DemoPanel({ mode, onModeChange }: Props) {
+export function DemoPanel({ mode, skin, onModeChange, onSkinChange }: Props) {
   const [open, setOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openedOnce = useRef(false);
 
-  const select = (next: AnswerMode): void => {
-    saveAnswerMode(next);
-    onModeChange(next);
-  };
+  /*
+   * The panel replaces the toggle in the DOM, so opening it unmounts whatever
+   * had focus and leaves the caret on <body>: a keyboard user then has to tab
+   * from the top of the page to reach the options they just opened. Focus is
+   * moved into the panel instead, and handed back to the toggle on close - the
+   * standard disclosure behaviour.
+   */
+  useEffect(() => {
+    if (open) {
+      openedOnce.current = true;
+      const first = panelRef.current?.querySelector<HTMLInputElement>(
+        'input[type="radio"]',
+      );
+      (first ?? panelRef.current)?.focus();
+      return;
+    }
+
+    // Not on first paint: focusing the toggle on mount would pull the caret
+    // out of the composer before the user has typed anything.
+    if (openedOnce.current) toggleRef.current?.focus();
+  }, [open]);
 
   return (
     <div className="demo" data-open={open}>
       {open ? (
-        <div className="demo__panel" role="group" aria-label="Демо-режим">
+        <div
+          className="demo__panel"
+          role="group"
+          aria-label="Демо-режим"
+          ref={panelRef}
+          tabIndex={-1}
+        >
           <div className="demo__head">
             <p className="demo__title">Демо-режим</p>
             <button
@@ -54,7 +82,29 @@ export function DemoPanel({ mode, onModeChange }: Props) {
           </div>
 
           <fieldset className="demo__options">
-            <legend className="sr-only">Как отвечать на вопросы</legend>
+            <legend className="demo__legend">Оформление</legend>
+
+            {SKINS.map((entry) => (
+              <label
+                key={entry.name}
+                className="demo__option"
+                data-active={skin === entry.name}
+              >
+                <input
+                  type="radio"
+                  name="skin"
+                  value={entry.name}
+                  checked={skin === entry.name}
+                  onChange={() => onSkinChange(entry.name)}
+                  className="sr-only"
+                />
+                <span className="demo__option-title">{entry.label}</span>
+              </label>
+            ))}
+          </fieldset>
+
+          <fieldset className="demo__options">
+            <legend className="demo__legend">Как отвечать</legend>
 
             {MODES.map((entry) => (
               <label
@@ -67,7 +117,7 @@ export function DemoPanel({ mode, onModeChange }: Props) {
                   name="answer-mode"
                   value={entry.value}
                   checked={mode === entry.value}
-                  onChange={() => select(entry.value)}
+                  onChange={() => onModeChange(entry.value)}
                   className="sr-only"
                 />
                 <span className="demo__option-title">{entry.title}</span>
@@ -77,8 +127,9 @@ export function DemoPanel({ mode, onModeChange }: Props) {
           </fieldset>
 
           <p className="demo__hint">
-            Режим применится к следующему сообщению. История диалога хранится
-            только в этой вкладке и сбрасывается при её закрытии.
+            Оба выбора применяются сразу: оформление - ко всему экрану, режим
+            ответа - к следующему сообщению. История диалога хранится только в
+            этой вкладке и сбрасывается при её закрытии.
           </p>
         </div>
       ) : (
@@ -87,6 +138,7 @@ export function DemoPanel({ mode, onModeChange }: Props) {
           className="demo__toggle"
           onClick={() => setOpen(true)}
           aria-expanded={false}
+          ref={toggleRef}
         >
           <SlidersHorizontal size={14} aria-hidden="true" />
           Демо-режим
