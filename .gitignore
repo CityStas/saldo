@@ -15,3 +15,10 @@ openrouter_free_logic/
 # file contains a live API key, so it must never be tracked.
 TASK.md
 стек.txt
+
+# Reference material and scratch files: the single-file example the model
+# selection logic was compared against, raw responses pasted out of `curl`, and
+# the assistant's own working directory. None of it belongs in the repository.
+xample_fast.html
+probe*.json
+.workbuddy-ai/
