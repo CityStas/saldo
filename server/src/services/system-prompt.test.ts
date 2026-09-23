@@ -26,4 +26,11 @@ describe('withSystemPrompt', () => {
     expect(SYSTEM_PROMPT).toContain('входящего НДС');
     expect(SYSTEM_PROMPT).toContain('САЛЬДО');
   });
+
+  it('uses hyphens only, like the rest of the project', () => {
+    // The brief asks for no em dashes anywhere in the product, the persona
+    // included - and it has to ask the model for the same.
+    expect(SYSTEM_PROMPT).not.toMatch(/[\u2013\u2014]/);
+    expect(SYSTEM_PROMPT).toContain('Длинное тире не используй');
+  });
 });
