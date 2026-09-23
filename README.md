@@ -20,6 +20,11 @@
 
 Нужен Node.js 20+ и ключ [OpenRouter](https://openrouter.ai/keys).
 
+Ключа в репозитории нет и быть не может: это первое техническое требование задания, а `.env` в
+git не попадает. Регистрация на OpenRouter бесплатна и без карты, бесплатный тариф даёт 50
+запросов в сутки на ключ. Без ключа сервер не стартует молча, а сразу говорит, чего не хватает:
+`OPENROUTER_API_KEY is not set. Copy .env.example to .env and add your key.`
+
 ```bash
 npm install
 cp .env.example .env
