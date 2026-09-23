@@ -1,7 +1,13 @@
-import type { ChatMessage, ThemeMode, ThemeName } from '../types/chat';
+import type {
+  AnswerMode,
+  ChatMessage,
+  ThemeMode,
+  ThemeName,
+} from '../types/chat';
 
 const HISTORY_KEY = 'saldo-chat:history:v1';
 const THEME_KEY = 'saldo-chat:theme:v1';
+const ANSWER_MODE_KEY = 'saldo-chat:answer-mode:v1';
 const MAX_STORED_MESSAGES = 60;
 
 /**
@@ -78,6 +84,34 @@ export function loadTheme(): StoredTheme | null {
 export function saveTheme(theme: StoredTheme): void {
   try {
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * The demo panel's mode is a viewing preference, not part of the dialog, so it
+ * survives a reload on its own key and does not touch the conversation.
+ */
+export const DEFAULT_ANSWER_MODE: AnswerMode = 'consult';
+
+export function loadAnswerMode(): AnswerMode | null {
+  try {
+    const raw = localStorage.getItem(ANSWER_MODE_KEY);
+    return raw === 'consult' || raw === 'full' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Stored mode, or the product default. */
+export function initialAnswerMode(): AnswerMode {
+  return loadAnswerMode() ?? DEFAULT_ANSWER_MODE;
+}
+
+export function saveAnswerMode(mode: AnswerMode): void {
+  try {
+    localStorage.setItem(ANSWER_MODE_KEY, mode);
   } catch {
     // ignore
   }

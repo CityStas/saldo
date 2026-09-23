@@ -13,6 +13,13 @@ export type ChatErrorCode =
 
 export type MessageStatus = 'complete' | 'streaming' | 'stopped' | 'failed';
 
+/**
+ * `consult` answers and, when the task needs it, points at the matching service.
+ * `full` answers as completely as it can with no service offer - the second
+ * mode of the demo panel.
+ */
+export type AnswerMode = 'consult' | 'full';
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;

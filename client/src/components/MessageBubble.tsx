@@ -4,10 +4,12 @@ import { Markdown } from './Markdown';
 import { ServiceCta } from './ServiceCta';
 import { formatDuration, formatTime } from '../lib/format';
 import { splitServiceMarker } from '../lib/service-marker';
-import type { ChatMessage } from '../types/chat';
+import type { AnswerMode, ChatMessage } from '../types/chat';
 
 interface Props {
   message: ChatMessage;
+  /** In `full` mode the service card is never rendered, tag or no tag. */
+  answerMode?: AnswerMode;
 }
 
 const STATUS_LABEL: Record<ChatMessage['status'], string | null> = {
@@ -17,7 +19,7 @@ const STATUS_LABEL: Record<ChatMessage['status'], string | null> = {
   failed: 'ошибка',
 };
 
-export function MessageBubble({ message }: Props) {
+export function MessageBubble({ message, answerMode = 'consult' }: Props) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const statusLabel = STATUS_LABEL[message.status];
@@ -58,7 +60,7 @@ export function MessageBubble({ message }: Props) {
           <span className="message__caret" aria-hidden="true" />
         ) : null}
 
-        {service && message.status !== 'streaming' ? (
+        {service && answerMode === 'consult' && message.status !== 'streaming' ? (
           <ServiceCta service={service} />
         ) : null}
       </div>

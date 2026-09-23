@@ -1,5 +1,10 @@
 import { SseDecoder } from './sse';
-import type { ChatErrorCode, ChatMessage, DonePayload } from '../types/chat';
+import type {
+  AnswerMode,
+  ChatErrorCode,
+  ChatMessage,
+  DonePayload,
+} from '../types/chat';
 
 /** Thrown for a non-2xx response, before any streaming has started. */
 export class ChatRequestError extends Error {
@@ -44,18 +49,25 @@ interface ErrorBody {
  * The API key never appears here - the browser only ever talks to our own
  * server, which is the whole point of the BFF.
  */
+export interface StreamOptions {
+  model?: string;
+  /** Defaults to the server's own default (`consult`) when omitted. */
+  mode?: AnswerMode;
+}
+
 export async function streamChat(
   messages: ChatMessage[],
   signal: AbortSignal,
   handlers: StreamHandlers,
-  model?: string,
+  options: StreamOptions = {},
 ): Promise<void> {
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       messages: messages.map(({ role, content }) => ({ role, content })),
-      ...(model ? { model } : {}),
+      ...(options.model ? { model: options.model } : {}),
+      ...(options.mode ? { mode: options.mode } : {}),
     }),
     signal,
   });

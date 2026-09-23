@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
+import { DemoPanel } from './components/DemoPanel';
 import { EmptyState } from './components/EmptyState';
 import { ErrorNotice } from './components/ErrorMessage';
 import { MessageBubble } from './components/MessageBubble';
@@ -10,7 +11,8 @@ import { useChat } from './hooks/useChat';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useTheme } from './hooks/useTheme';
 import { errorCopy } from './lib/errors';
-import type { ChatMessage } from './types/chat';
+import { initialAnswerMode } from './lib/storage';
+import type { AnswerMode, ChatMessage } from './types/chat';
 
 function statusFor(
   messages: ChatMessage[],
@@ -30,6 +32,8 @@ function statusFor(
 }
 
 export default function App() {
+  const [answerMode, setAnswerMode] = useState<AnswerMode>(initialAnswerMode);
+
   const {
     messages,
     isGenerating,
@@ -40,7 +44,7 @@ export default function App() {
     retryLast,
     clearChat,
     dismissError,
-  } = useChat();
+  } = useChat(answerMode);
 
   const { theme, mode, setTheme, toggleMode } = useTheme();
   const { containerRef, isPinned, onScroll, scrollToBottom } =
@@ -114,7 +118,11 @@ export default function App() {
           ) : (
             <div className="chat__thread">
               {visibleMessages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  answerMode={answerMode}
+                />
               ))}
 
               {isGenerating ? (
@@ -152,6 +160,8 @@ export default function App() {
           onStop={stopGeneration}
         />
       </main>
+
+      <DemoPanel mode={answerMode} onModeChange={setAnswerMode} />
 
       {/*
         A dedicated live region. Putting aria-live on the message list itself

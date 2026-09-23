@@ -993,6 +993,138 @@ kbd {
   }
 }
 
+/* ------------------------------------------------------- demo switch ----- */
+
+/*
+ * Floats on the side so it is reachable from anywhere in the dialog without
+ * competing with the header, which is already the busiest row on the page.
+ */
+.demo {
+  position: fixed;
+  top: 92px;
+  right: 18px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.demo__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  box-shadow: var(--shadow-card);
+  transition: color 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.demo__toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.demo__panel {
+  width: 272px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.demo__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  margin-bottom: 10px;
+}
+
+.demo__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.demo__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+}
+
+.demo__close:hover {
+  color: var(--text);
+  background: var(--bg-alt);
+}
+
+.demo__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.demo__option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.16s var(--ease), background-color 0.16s var(--ease);
+}
+
+.demo__option:hover {
+  border-color: var(--border-strong);
+}
+
+.demo__option[data-active='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The radio is visually hidden, so the ring goes on the option. */
+.demo__option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.demo__option-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.demo__option-text {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.demo__hint {
+  margin: 10px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 /* -------------------------------------------------------------- mobile --- */
 
 @media (max-width: 680px) {
@@ -1037,6 +1169,18 @@ kbd {
 
   .tg-button__label--short {
     display: inline;
+  }
+
+  /* On a phone the panel would cover the conversation, so it drops to the
+     bottom-right corner and opens as a sheet under the header. */
+  .demo {
+    top: auto;
+    right: 12px;
+    bottom: 108px;
+  }
+
+  .demo__panel {
+    width: min(272px, calc(100vw - 24px));
   }
 
   .chat__log {

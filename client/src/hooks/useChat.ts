@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { streamChat } from '../lib/api';
 import { classifyError } from '../lib/errors';
 import { clearStoredHistory, loadHistory, saveHistory } from '../lib/storage';
-import type { ChatError, ChatErrorCode, ChatMessage, DonePayload } from '../types/chat';
+import type {
+  AnswerMode,
+  ChatError,
+  ChatErrorCode,
+  ChatMessage,
+  DonePayload,
+} from '../types/chat';
 
 function createId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -26,7 +32,7 @@ export interface UseChatResult {
   dismissError: () => void;
 }
 
-export function useChat(): UseChatResult {
+export function useChat(mode: AnswerMode = 'consult'): UseChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>(loadHistory);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<ChatError | null>(null);
@@ -34,6 +40,13 @@ export function useChat(): UseChatResult {
   const controllerRef = useRef<AbortController | null>(null);
   const messagesRef = useRef(messages);
   const lastSaveRef = useRef(0);
+
+  // Read at request time, not captured: switching the demo mode must affect the
+  // next message without rebuilding every callback.
+  const modeRef = useRef(mode);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -155,6 +168,7 @@ export function useChat(): UseChatResult {
               outcome.done = payload;
             },
           },
+          { mode: modeRef.current },
         );
       } catch (caught) {
         if (!controller.signal.aborted) {

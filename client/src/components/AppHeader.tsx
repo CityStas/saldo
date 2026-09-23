@@ -44,16 +44,22 @@ export function AppHeader({
           />
         ) : null}
 
-        <button
-          type="button"
-          className="icon-button"
-          onClick={onClear}
-          disabled={!canClear}
-          aria-label="Очистить диалог"
-          title="Очистить диалог"
-        >
-          <Trash2 size={16} aria-hidden="true" />
-        </button>
+        {/*
+          Not rendered at all while the dialog is empty: an always-present
+          disabled button on the first screen is noise. It appears as soon as
+          there is something to clear.
+        */}
+        {canClear ? (
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClear}
+            aria-label="Очистить диалог"
+            title="Очистить диалог"
+          >
+            <Trash2 size={16} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
     </header>
   );
