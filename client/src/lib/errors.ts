@@ -8,6 +8,12 @@ interface ErrorCopy {
   retryable: boolean;
 }
 
+/**
+ * How long a rate limit has to last before it stops being "wait a bit" and
+ * becomes "the free daily window is spent".
+ */
+const DAILY_LIMIT_HINT_MS = 30 * 60_000;
+
 const COPY: Record<ChatErrorCode, ErrorCopy> = {
   RATE_LIMIT: {
     title: 'Лимит бесплатных запросов исчерпан',
@@ -31,7 +37,7 @@ const COPY: Record<ChatErrorCode, ErrorCopy> = {
   },
   AUTH: {
     title: 'Ключ OpenRouter отклонён',
-    body: 'Сервер получил 401/403 от OpenRouter. Проверь OPENROUTER_API_KEY в файле .env.',
+    body: 'Сервер получил 401/403 от OpenRouter. Проверь ключи в OPENROUTER_API_KEY и OPENROUTER_API_KEYS в файле .env - отклонённый ключ отключается на сутки, остальные продолжают работать.',
     retryable: false,
   },
   BAD_REQUEST: {
@@ -56,7 +62,26 @@ const COPY: Record<ChatErrorCode, ErrorCopy> = {
   },
 };
 
-export function errorCopy(code: ChatErrorCode): ErrorCopy {
+/**
+ * A rate limit that lasts for hours is not a rate limit, it is the spent daily
+ * window - and "подожди и отправь снова" is then actively misleading advice.
+ * The upstream message names the real remedy, so the copy says the same thing.
+ */
+const DAILY_LIMIT_COPY: ErrorCopy = {
+  title: 'Суточный лимит бесплатных запросов исчерпан',
+  body: 'У бесплатных моделей OpenRouter 50 запросов в сутки на ключ, и на сегодня они израсходованы. Ждать до сброса окна. Если нужно больше, пополни ключ на 10 кредитов - тогда лимит станет 1000 запросов в сутки. Либо добавь второй ключ в OPENROUTER_API_KEYS: сервер переключается между ними сам.',
+  retryable: false,
+};
+
+export function errorCopy(code: ChatErrorCode, retryAfterMs?: number): ErrorCopy {
+  if (
+    code === 'RATE_LIMIT' &&
+    retryAfterMs !== undefined &&
+    retryAfterMs > DAILY_LIMIT_HINT_MS
+  ) {
+    return DAILY_LIMIT_COPY;
+  }
+
   return COPY[code];
 }
 
@@ -86,5 +111,6 @@ export function classifyError(error: unknown): ChatError {
 export function formatRetryAfter(ms: number): string {
   const seconds = Math.max(1, Math.ceil(ms / 1000));
   if (seconds < 60) return `${seconds} с`;
-  return `${Math.ceil(seconds / 60)} мин`;
+  if (seconds < 3600) return `${Math.ceil(seconds / 60)} мин`;
+  return `${Math.ceil(seconds / 3600)} ч`;
 }

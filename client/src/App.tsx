@@ -86,8 +86,10 @@ export default function App() {
     );
   }, [messages]);
 
-  const liveStatus = error
-    ? `${errorCopy(error.code).title}. ${errorCopy(error.code).body}`
+  const errorCopyText = error ? errorCopy(error.code, error.retryAfterMs) : null;
+
+  const liveStatus = errorCopyText
+    ? `${errorCopyText.title}. ${errorCopyText.body}`
     : statusFor(messages, isGenerating, isFormulating);
 
   return (

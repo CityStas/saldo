@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function ErrorNotice({ error, canRetry, onRetry, onDismiss }: Props) {
-  const copy = errorCopy(error.code);
+  const copy = errorCopy(error.code, error.retryAfterMs);
 
   return (
     <div className="notice" role="alert" data-code={error.code}>
