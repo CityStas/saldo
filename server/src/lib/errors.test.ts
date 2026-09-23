@@ -118,8 +118,10 @@ describe('AppError', () => {
  * a response body would be as visible as one in a request header.
  */
 describe('redactSecrets', () => {
-  const KEY =
-    'sk-or-v1-fixture-not-a-real-key';
+  // A key-shaped string that is unmistakably not a key. The test only needs the
+  // shape, and putting anything real here would put a working credential in the
+  // repository - which is the thing this test exists to prevent.
+  const KEY = 'sk-or-v1-fixture-not-a-real-key';
 
   it('removes a key an upstream body happened to contain', () => {
     const error = fromUpstreamStatus(

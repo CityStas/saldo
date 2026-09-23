@@ -88,8 +88,11 @@ describe('readChatStream', () => {
     // OpenRouter can report a failure after HTTP 200. This text does not become
     // an AppError - it is forwarded to the browser as a delta - so it has to be
     // cleaned on its own, or the Network tab shows the key in the SSE body.
-    const key =
-      'sk-or-v1-fixture-not-a-real-key';
+    // Key-shaped and unmistakably not a key: a test fixture only needs the
+    // shape, and a working credential must never sit in the repository when the
+    // whole point of this code is that a key does not end up somewhere it can
+    // be read.
+    const key = 'sk-or-v1-fixture-not-a-real-key';
     const frame = `data: ${JSON.stringify({ error: { message: `Bad key ${key}` } })}\n\n`;
 
     const error = (await collect([frame])).find((d) => d.error)?.error ?? '';
