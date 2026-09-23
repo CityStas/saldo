@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { AppError } from '../lib/errors.js';
 import {
   fetchFreeQuota,
   listFreeModels,
@@ -6,7 +7,7 @@ import {
   type FreeQuota,
   type OpenRouterModel,
 } from './openrouter.js';
-import type { ModelInfo, ModelStatus } from '../types/chat.js';
+import type { ChatErrorCode, ModelInfo, ModelStatus } from '../types/chat.js';
 
 /** Router model that picks a free model upstream. Always kept as last resort. */
 const ROUTER_MODEL = 'openrouter/free';
@@ -27,12 +28,35 @@ const WORKING_RECHECK_MS = 6 * 60 * 60_000;
 /** How long a quota reading stays usable before it is asked for again. */
 const QUOTA_TTL_MS = 15_000;
 
+/**
+ * Why the catalog could not be read, kept as a typed error rather than a string.
+ *
+ * An empty catalog has two very different causes, and until this existed they
+ * shared one answer: "no free models are available right now". That is true of
+ * a catalog that legitimately came back empty and badly misleading about a
+ * provider that refuses the request outright - a blocked address, a rejected
+ * key, an unreachable host. The caller can only tell them apart if the reason
+ * survives discovery, and it does not survive as a message: `AUTH` and
+ * `NO_MODELS` are not distinguished by text.
+ *
+ * `lastError` stays as the human-readable string for `/api/models`; this is the
+ * same event in the form a decision can be made on.
+ */
+export interface DiscoveryFailure {
+  code: ChatErrorCode;
+  status: number;
+  message: string;
+  /** Epoch ms, so a caller can tell a fresh failure from a stale one. */
+  at: number;
+}
+
 interface RegistryState {
   models: ModelInfo[];
   refreshedAt: number;
   discovery: Promise<void> | null;
   probing: Promise<void> | null;
   lastError: string | null;
+  failure: DiscoveryFailure | null;
   quota: FreeQuota | null;
   quotaCheckedAt: number;
   /** No key can serve a request before this moment. Stops pointless probing. */
@@ -45,6 +69,7 @@ const state: RegistryState = {
   discovery: null,
   probing: null,
   lastError: null,
+  failure: null,
   quota: null,
   quotaCheckedAt: 0,
   limitUntil: 0,
@@ -87,7 +112,14 @@ async function discover(): Promise<void> {
   const usable = free.filter((model) => !isBlocked(model.id));
 
   if (usable.length === 0) {
-    throw new Error('OpenRouter reported no free text models.');
+    // Typed, not a bare Error: "the catalog came back with nothing usable" is a
+    // real answer from a healthy provider, and it must not be confused with
+    // "the provider would not talk to us".
+    throw new AppError(
+      'NO_MODELS',
+      'OpenRouter reported no free text models.',
+      503,
+    );
   }
 
   const previous = new Map(state.models.map((model) => [model.id, model]));
@@ -107,8 +139,56 @@ async function discover(): Promise<void> {
   state.models = next;
   state.refreshedAt = Date.now();
   state.lastError = null;
+  state.failure = null;
 
   void probeAll();
+}
+
+/**
+ * Turn anything discovery can throw into a typed reason.
+ *
+ * `AppError` arrives already classified - a 403 block is `UPSTREAM_BLOCKED`, a
+ * rejected key is `AUTH`, a 5xx is `UPSTREAM_ERROR`. A `TypeError` is fetch
+ * failing to reach the host at all. What is left is the deadline wrapper, whose
+ * rejection is the only plain `Error` this path produces.
+ */
+function asFailure(error: unknown): DiscoveryFailure {
+  if (error instanceof AppError) {
+    return {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+      at: Date.now(),
+    };
+  }
+
+  if (error instanceof TypeError) {
+    return { code: 'NETWORK', status: 502, message: error.message, at: Date.now() };
+  }
+
+  return {
+    code: 'TIMEOUT',
+    status: 504,
+    message: error instanceof Error ? error.message : 'Model discovery failed.',
+    at: Date.now(),
+  };
+}
+
+function rememberFailure(error: unknown): void {
+  const failure = asFailure(error);
+  state.failure = failure;
+  state.lastError = failure.message;
+}
+
+/**
+ * Why the catalog is empty, or `null` when the last round succeeded.
+ *
+ * Only meaningful while `models` is empty: a failed refresh keeps the previous
+ * list, and a previous list means the reason no longer describes anything the
+ * caller has to deal with.
+ */
+export function lastDiscoveryFailure(): DiscoveryFailure | null {
+  return state.failure;
 }
 
 /**
@@ -145,8 +225,7 @@ export async function ensureDiscovered(force = false): Promise<ModelInfo[]> {
   if (!state.discovery) {
     state.discovery = withDeadline(discover(), config.discoveryDeadlineMs)
       .catch((error: unknown) => {
-        state.lastError =
-          error instanceof Error ? error.message : 'Model discovery failed.';
+        rememberFailure(error);
         // Keep serving the previous list instead of failing hard.
       })
       .finally(() => {

@@ -9,6 +9,7 @@ import {
   AppError,
   fromUpstreamStatus,
   isAbortError,
+  isKeyScoped,
   isRetryable,
 } from '../lib/errors.js';
 import { encodeSse } from '../lib/sse.js';
@@ -30,6 +31,7 @@ import {
 } from '../services/dialogue-policy.js';
 import {
   ensureDiscovered,
+  lastDiscoveryFailure,
   markCooldown,
   markWorking,
   noteGlobalLimit,
@@ -52,6 +54,35 @@ interface OpenedStream {
 }
 
 /**
+ * Nothing to try, and the reason is not always the same one.
+ *
+ * An empty catalog used to have a single answer - "no free models are available
+ * right now" - and that answer was wrong in the case that matters most. When
+ * the provider refuses the request outright (a blocked address, a rejected key,
+ * an unreachable host) the catalog never fills up, so the chat reported a
+ * shortage of models while the truth was that nothing could be reached at all.
+ *
+ * Worse, it was reported as `NO_MODELS`, which the rotation below does not
+ * treat as key-scoped: a dead key left the catalog empty on every attempt and
+ * was therefore never rotated away. Reporting the reason discovery actually
+ * failed with fixes both - `AUTH` is key-scoped, so the caller moves to the
+ * next key, while `UPSTREAM_BLOCKED` is not, so it stops instead of spending
+ * the other keys against a wall.
+ */
+function emptyCatalogError(): AppError {
+  const failure = lastDiscoveryFailure();
+  if (failure) {
+    return new AppError(failure.code, failure.message, failure.status);
+  }
+
+  return new AppError(
+    'NO_MODELS',
+    'No free models are available right now. Try again in a minute.',
+    503,
+  );
+}
+
+/**
  * Try candidate models until one accepts the request.
  *
  * A model that answers 429 or 5xx is put on cooldown and we move on - for a
@@ -68,13 +99,7 @@ async function tryCandidates(
     '';
   const candidates = selectCandidates(query, requestedModel);
 
-  if (candidates.length === 0) {
-    throw new AppError(
-      'NO_MODELS',
-      'No free models are available right now. Try again in a minute.',
-      503,
-    );
-  }
+  if (candidates.length === 0) throw emptyCatalogError();
 
   const attempts = candidates.slice(0, MAX_ATTEMPTS);
   let lastError: AppError | null = null;
@@ -103,7 +128,11 @@ async function tryCandidates(
 
       const text = await response.text().catch(() => '');
       lastError = fromUpstreamStatus(response.status, text);
-      markCooldown(candidate.id);
+
+      // A key problem is not a model problem. Cooling the model down here used
+      // to park a healthy model for every rejected key, so rotating away from a
+      // dead key degraded the pool it was trying to save.
+      if (!isKeyScoped(lastError)) markCooldown(candidate.id);
 
       if (!isRetryable(lastError)) throw lastError;
     } catch (error) {
@@ -122,7 +151,10 @@ async function tryCandidates(
         );
       }
 
-      markCooldown(candidate.id);
+      // Same reasoning as above: the model did not fail, the request never got
+      // far enough to ask it anything.
+      if (!isKeyScoped(lastError)) markCooldown(candidate.id);
+
       if (!isRetryable(lastError)) throw lastError;
     }
   }
@@ -130,19 +162,6 @@ async function tryCandidates(
   throw (
     lastError ?? new AppError('UPSTREAM_ERROR', 'Every candidate model failed.', 502)
   );
-}
-
-/**
- * True when the failure is about the KEY rather than the model, and another key
- * might therefore do better.
- *
- * A model-scoped 429 means "this model is busy, try another" and rotating keys
- * would not help. An AUTH failure or a key-wide daily limit means every model
- * behind this key will fail the same way.
- */
-function isKeyScoped(error: AppError): boolean {
-  if (error.code === 'AUTH') return true;
-  return error.code === 'RATE_LIMIT' && error.scope === 'global';
 }
 
 /**
@@ -163,6 +182,13 @@ async function openFirstWorkingStream(
 
   for (let attempt = 0; attempt < keysToTry; attempt += 1) {
     try {
+      // Discovery lives INSIDE the loop on purpose: reading the catalog uses
+      // the current key, so a rejected key fails here first, and rotating is
+      // what gets the retry - and every later request - onto a key that works.
+      // Outside the loop a dead key left the catalog empty, and an empty
+      // catalog was reported as "no models available" and never rotated.
+      await ensureDiscovered();
+
       return await tryCandidates(messages, requestedModel, signal);
     } catch (error) {
       if (!(error instanceof AppError) || !isKeyScoped(error)) throw error;
@@ -311,8 +337,6 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
   let opened: OpenedStream;
 
   try {
-    await ensureDiscovered();
-
     // Deliberately NO pre-flight quota gate here.
     //
     // An earlier version read `free_model_daily_requests` from `GET /key` and

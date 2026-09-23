@@ -31,8 +31,20 @@ const COPY: Record<ChatErrorCode, ErrorCopy> = {
     retryable: true,
   },
   NO_MODELS: {
-    title: 'Сервис недоступен',
-    body: 'Свободных исполнителей сейчас нет. Подожди минуту - список обновляется автоматически.',
+    title: 'Амалия отошла',
+    body: 'Но скоро вернётся и сразу ответит. Отправь сообщение ещё раз через минуту.',
+    retryable: true,
+  },
+  /*
+   * The provider refused the request before it reached a model - a blocked
+   * address, most often. It is not the user's question and not something they
+   * can fix, so the copy says who is at fault instead of hinting at their
+   * input, and it deliberately does NOT read like `NO_MODELS`: "Амалия отошла"
+   * would suggest she is merely busy, and here she is unreachable.
+   */
+  UPSTREAM_BLOCKED: {
+    title: 'Амалия не может ответить',
+    body: 'Сервис моделей отклонил запрос с этого адреса, поэтому ответить сейчас нечем. Дело не в твоём вопросе - попробуй позже.',
     retryable: true,
   },
   AUTH: {

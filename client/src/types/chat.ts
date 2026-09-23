@@ -4,6 +4,7 @@ export type ChatErrorCode =
   | 'BAD_REQUEST'
   | 'NO_MODELS'
   | 'AUTH'
+  | 'UPSTREAM_BLOCKED'
   | 'RATE_LIMIT'
   | 'TIMEOUT'
   | 'UPSTREAM_ERROR'

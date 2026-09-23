@@ -75,9 +75,41 @@ function parseUpstream(body: string): {
   }
 }
 
+/**
+ * A 403 that is not OpenRouter's own error envelope.
+ *
+ * The two are identical by status code and mean opposite things. OpenRouter
+ * rejects credentials with `{"error":{"message":...,"code":...}}`; an edge in
+ * front of it answers in its own shape - measured 2026-09 from a Russian IP,
+ * `{"success":false,"error":"Access denied by security policy."}`, where
+ * `error` is a string rather than an object - or with an HTML page.
+ *
+ * Telling them apart matters because the remedy is different, and the wrong one
+ * sends the reader to check keys that are fine. `AUTH` means "this key is not
+ * accepted"; `UPSTREAM_BLOCKED` means "this address is not allowed in".
+ */
+function isEdgeBlock(status: number, body: string): boolean {
+  if (status !== 403) return false;
+
+  try {
+    const parsed = JSON.parse(body) as UpstreamErrorPayload;
+    return typeof parsed.error?.message !== 'string';
+  } catch {
+    return true;
+  }
+}
+
 /** Map an upstream HTTP failure to a typed error we can act on. */
 export function fromUpstreamStatus(status: number, body: string): AppError {
   const detail = parseUpstream(body);
+
+  if (isEdgeBlock(status, body)) {
+    return new AppError(
+      'UPSTREAM_BLOCKED',
+      `The request was refused before it reached a model (${status}). ${detail.message}`,
+      502,
+    );
+  }
 
   if (status === 401 || status === 403) {
     return new AppError(
@@ -126,9 +158,26 @@ export function fromUpstreamStatus(status: number, body: string): AppError {
   );
 }
 
+/**
+ * True when the failure is about the KEY rather than the model, and another key
+ * might therefore do better.
+ *
+ * A model-scoped 429 means "this model is busy, try another" and rotating keys
+ * would not help. An AUTH failure or a key-wide daily limit means every model
+ * behind this key fails the same way, so the next key is worth trying.
+ *
+ * A block is deliberately NOT key-scoped: it is enforced on the address the
+ * request comes from, so a second key behind the same address changes nothing.
+ * Rotating on it would only cost the user another failed round trip.
+ */
+export function isKeyScoped(error: AppError): boolean {
+  if (error.code === 'AUTH') return true;
+  return error.code === 'RATE_LIMIT' && error.scope === 'global';
+}
+
 export function isRetryable(error: AppError): boolean {
-  // AUTH, BAD_REQUEST and a key-wide rate limit are terminal: trying another
-  // model cannot help, it only consumes more of the shared quota.
+  // AUTH, BAD_REQUEST, a key-wide rate limit and a block are terminal: trying
+  // another model cannot help, it only consumes more of the shared quota.
   if (error.code === 'RATE_LIMIT' && error.scope === 'global') return false;
 
   return (
