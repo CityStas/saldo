@@ -16,6 +16,12 @@ import { validateChatRequest } from '../lib/validation.js';
 import { openChatStream, readChatStream } from '../services/openrouter.js';
 import { withSystemPrompt } from '../services/system-prompt.js';
 import {
+  cannedAnswer,
+  detectIntent,
+  lastUserMessage,
+  userTurnCount,
+} from '../services/dialogue-policy.js';
+import {
   ensureDiscovered,
   getQuota,
   markCooldown,
@@ -28,6 +34,9 @@ export const chatRouter = Router();
 
 /** Stop after this many upstream attempts, even if more models are listed. */
 const MAX_ATTEMPTS = 4;
+
+/** Reported as the model name for answers that never touched a model. */
+const SCRIPT_SOURCE = 'saldo';
 
 interface OpenedStream {
   response: Response;
@@ -116,6 +125,30 @@ async function openFirstWorkingStream(
   );
 }
 
+/**
+ * Cut a fixed answer into a few deltas so the client still goes through its
+ * normal stream path instead of a special case. Boundaries fall on spaces, so
+ * no word is split.
+ */
+function sliceForStream(text: string, size = 28): string[] {
+  const words = text.split(' ');
+  const chunks: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    const candidate = current === '' ? word : `${current} ${word}`;
+    if (candidate.length > size && current !== '') {
+      chunks.push(`${current} `);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current !== '') chunks.push(current);
+  return chunks;
+}
+
 chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
   const requestId = randomUUID();
   const startedAt = Date.now();
@@ -152,6 +185,60 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
     }
   });
 
+  // Committing the status line means every later problem has to be reported
+  // in-band as an SSE `error` event, so both answer paths open the stream the
+  // same way and share one `send`.
+  const openStream = (): ((event: ServerEvent) => void) => {
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('X-Request-Id', requestId);
+    res.flushHeaders();
+
+    return (event: ServerEvent): void => {
+      if (clientGone || res.writableEnded) return;
+      res.write(encodeSse(event.event, event.data));
+    };
+  };
+
+  // A bare greeting and a "кто ты" have exactly one right answer. Sending them
+  // to a model would spend the shared free-tier budget, would fail whenever
+  // every model is cooling down, and would let the wording drift between
+  // sessions. Answered here, before the quota check and before model selection.
+  const opening = userTurnCount(body.messages) <= 1;
+  const intent = detectIntent(lastUserMessage(body.messages));
+  const canned = cannedAnswer(intent, opening);
+
+  if (canned !== null) {
+    clearTimeout(timeout);
+    const send = openStream();
+
+    send({
+      event: 'meta',
+      data: { model: SCRIPT_SOURCE, requestId, source: 'script' },
+    });
+
+    for (const chunk of sliceForStream(canned)) {
+      if (clientGone) break;
+      send({ event: 'delta', data: { text: chunk } });
+    }
+
+    send({
+      event: 'done',
+      data: {
+        model: SCRIPT_SOURCE,
+        finishReason: 'stop',
+        elapsedMs: Date.now() - startedAt,
+        attempts: 0,
+      },
+    });
+
+    if (!clientGone && !res.writableEnded) res.end();
+    return;
+  }
+
   let opened: OpenedStream;
 
   try {
@@ -171,7 +258,7 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
     }
 
     opened = await openFirstWorkingStream(
-      withSystemPrompt(body.messages),
+      withSystemPrompt(body.messages, { opening, mode: body.mode }),
       body.model,
       controller.signal,
     );
@@ -208,22 +295,12 @@ chatRouter.post('/chat', async (req: ExpressRequest, res: ExpressResponse) => {
     return;
   }
 
-  // From here on the status line is already committed, so every further
-  // problem must be reported in-band as an SSE `error` event.
-  res.status(200);
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.setHeader('X-Request-Id', requestId);
-  res.flushHeaders();
+  const send = openStream();
 
-  const send = (event: ServerEvent): void => {
-    if (clientGone || res.writableEnded) return;
-    res.write(encodeSse(event.event, event.data));
-  };
-
-  send({ event: 'meta', data: { model: opened.model, requestId } });
+  send({
+    event: 'meta',
+    data: { model: opened.model, requestId, source: 'model' },
+  });
 
   let finishReason: string | null = null;
   let failed: string | null = null;

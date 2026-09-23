@@ -58,4 +58,42 @@ describe('withSystemPrompt', () => {
     // The trailing whitespace of the caller's string is not carried over.
     expect(withReference.endsWith('счёт-фактура.')).toBe(true);
   });
+
+  it('greets only when it opens the dialog', () => {
+    const opening = promptFor({ opening: true });
+    const later = promptFor({ opening: false });
+
+    expect(opening).toContain('# Ситуация');
+    expect(opening).toContain('Начни ответ со слова «Здравствуйте!»');
+    expect(later).toContain('Не здоровайся');
+
+    // Not stated means no turn instruction at all, so an old call shape keeps
+    // the exact prompt it had before.
+    expect(promptFor()).toBe(SYSTEM_PROMPT);
+  });
+
+  it('drops the service offer in full-answer mode', () => {
+    const consult = promptFor({ mode: 'consult' });
+    const full = promptFor({ mode: 'full' });
+
+    expect(consult).toBe(SYSTEM_PROMPT);
+    expect(full).toContain('Режим полного ответа');
+    expect(full).toContain('не ставь служебную пометку про услугу');
+    // The tag catalogue itself stays: it is the persona's contract with the
+    // client parser, and the mode only turns it off for this answer.
+    expect(full).toContain('[[услуга: vat]]');
+  });
+
+  it('keeps both the turn and the reference block in one prompt', () => {
+    const prompt = promptFor({
+      opening: true,
+      mode: 'full',
+      reference: 'Ст. 169 НК РФ.',
+    });
+
+    expect(prompt.indexOf('# Ситуация')).toBeLessThan(
+      prompt.indexOf('# Справочные материалы'),
+    );
+    expect(prompt.endsWith('Ст. 169 НК РФ.')).toBe(true);
+  });
 });

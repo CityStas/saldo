@@ -60,4 +60,45 @@ describe('validateChatRequest', () => {
     });
     expect(result.messages[0]).toEqual({ role: 'user', content: 'hi' });
   });
+
+  it('drops an assistant turn that produced nothing', () => {
+    // A stopped or failed request leaves an empty assistant turn behind. It is
+    // forwarded to nobody: an empty turn is not valid conversation history.
+    const result = validateChatRequest({
+      messages: [
+        { role: 'user', content: 'Первый' },
+        { role: 'assistant', content: '' },
+        { role: 'assistant', content: '   ' },
+        { role: 'user', content: 'Второй' },
+      ],
+    });
+
+    expect(result.messages).toEqual([
+      { role: 'user', content: 'Первый' },
+      { role: 'user', content: 'Второй' },
+    ]);
+  });
+
+  it('rejects a conversation that is empty after the drop', () => {
+    expect(() =>
+      validateChatRequest({ messages: [{ role: 'assistant', content: '' }] }),
+    ).toThrow(/non-empty message/);
+  });
+
+  it('accepts both answer modes and defaults to none', () => {
+    expect(validateChatRequest({ ...ok, mode: 'consult' }).mode).toBe('consult');
+    expect(validateChatRequest({ ...ok, mode: 'full' }).mode).toBe('full');
+    expect(validateChatRequest(ok).mode).toBeUndefined();
+  });
+
+  it('rejects an unknown answer mode instead of coercing it', () => {
+    // A typo in the client should surface here, not silently fall back to the
+    // default and look like a working demo mode.
+    expect(() => validateChatRequest({ ...ok, mode: 'full-answer' })).toThrow(
+      /mode must be one of/,
+    );
+    expect(() => validateChatRequest({ ...ok, mode: 7 })).toThrow(
+      /mode must be one of/,
+    );
+  });
 });

@@ -5,11 +5,25 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * How the assistant should answer.
+ *
+ * `consult` is the product default: answer the question and, when the task
+ * really needs work under a contract, point at the matching service.
+ * `full` is the demo's second mode: answer as completely as possible, with no
+ * service offer and no contact button.
+ */
+export type AnswerMode = 'consult' | 'full';
+
+export const ANSWER_MODES: readonly AnswerMode[] = ['consult', 'full'];
+
 export interface ChatRequestBody {
   /** Full conversation history, oldest first. */
   messages: ChatMessage[];
   /** Optional explicit model override, e.g. "openrouter/free". */
   model?: string;
+  /** Defaults to `consult` when omitted. */
+  mode?: AnswerMode;
 }
 
 export type ChatErrorCode =
@@ -58,7 +72,15 @@ export interface ModelsResponse {
 
 /** Server -> client events, framed as SSE. */
 export type ServerEvent =
-  | { event: 'meta'; data: { model: string; requestId: string } }
+  | {
+      event: 'meta';
+      data: {
+        model: string;
+        requestId: string;
+        /** `script` when the answer came from the canned dialogue policy. */
+        source?: 'model' | 'script';
+      };
+    }
   | { event: 'delta'; data: { text: string } }
   | { event: 'reasoning'; data: { text: string } }
   | { event: 'error'; data: { code: ChatErrorCode; message: string } }

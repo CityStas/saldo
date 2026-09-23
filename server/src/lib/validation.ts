@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { AppError } from './errors.js';
-import type { ChatMessage, ChatRequestBody } from '../types/chat.js';
+import { ANSWER_MODES } from '../types/chat.js';
+import type { AnswerMode, ChatMessage, ChatRequestBody } from '../types/chat.js';
 
 /**
  * Roles the browser may send. `system` is deliberately absent: the assistant
@@ -18,7 +19,7 @@ export function validateChatRequest(body: unknown): ChatRequestBody {
     throw new AppError('BAD_REQUEST', 'Body must be a JSON object.', 400);
   }
 
-  const { messages, model } = body as Partial<ChatRequestBody>;
+  const { messages, model, mode } = body as Partial<ChatRequestBody>;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new AppError('BAD_REQUEST', 'messages must be a non-empty array.', 400);
@@ -34,7 +35,13 @@ export function validateChatRequest(body: unknown): ChatRequestBody {
 
   let totalChars = 0;
 
-  const cleaned: ChatMessage[] = messages.map((message, index) => {
+  // An assistant turn that produced nothing carries no information: the user
+  // pressed Stop, or the request failed before the first token. Such a turn is
+  // dropped rather than forwarded, so one failed request cannot poison every
+  // later one in the same conversation.
+  const cleaned: ChatMessage[] = [];
+
+  messages.forEach((message, index) => {
     if (typeof message !== 'object' || message === null) {
       throw new AppError('BAD_REQUEST', `messages[${index}] is not an object.`, 400);
     }
@@ -58,8 +65,18 @@ export function validateChatRequest(body: unknown): ChatRequestBody {
     }
 
     totalChars += content.length;
-    return { role, content };
+
+    if (role === 'assistant' && content.trim() === '') return;
+    cleaned.push({ role, content });
   });
+
+  if (cleaned.length === 0) {
+    throw new AppError(
+      'BAD_REQUEST',
+      'messages must contain at least one non-empty message.',
+      400,
+    );
+  }
 
   if (totalChars > config.maxMessageChars) {
     throw new AppError(
@@ -73,5 +90,16 @@ export function validateChatRequest(body: unknown): ChatRequestBody {
     throw new AppError('BAD_REQUEST', 'model must be a string.', 400);
   }
 
-  return { messages: cleaned, model };
+  // Omitted mode keeps the previous behaviour: a consultation that may point at
+  // the matching service. Anything unrecognised is rejected rather than
+  // silently coerced, so a typo in the client shows up immediately.
+  if (mode !== undefined && !ANSWER_MODES.includes(mode as AnswerMode)) {
+    throw new AppError(
+      'BAD_REQUEST',
+      `mode must be one of: ${ANSWER_MODES.join(', ')}.`,
+      400,
+    );
+  }
+
+  return { messages: cleaned, model, mode: mode as AnswerMode | undefined };
 }
