@@ -178,14 +178,20 @@ export default function App() {
         ) : null}
 
         {isBlank ? null : composer}
-      </main>
 
-      <DemoPanel
-        mode={answerMode}
-        skin={skin}
-        onModeChange={setAnswerMode}
-        onSkinChange={setSkin}
-      />
+        {/*
+          The last row of the chat column. On a wide screen the stylesheet pins
+          it to the side of the page, which takes it out of flow and costs the
+          grid nothing; on a phone it comes back into flow and sits under the
+          field, where there is nothing left for it to cover.
+        */}
+        <DemoPanel
+          mode={answerMode}
+          skin={skin}
+          onModeChange={setAnswerMode}
+          onSkinChange={setSkin}
+        />
+      </main>
 
       {/*
         A dedicated live region. Putting aria-live on the message list itself

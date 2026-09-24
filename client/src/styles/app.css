@@ -77,6 +77,48 @@ button {
   border: 0;
 }
 
+/*
+ * Icon sizes, stated in CSS rather than left to the markup.
+ *
+ * Lucide draws its icons as inline SVG and sizes them through the `width` and
+ * `height` presentation attributes - plain numbers, no unit. Once that SVG is
+ * part of an HTML document those attributes are read as CSS declarations, and
+ * a bare number is not a length, so the declaration is invalid and gets thrown
+ * away. WebKit follows the spec here and the icon is left with no used size at
+ * all: it collapses into a dot. Chrome quietly accepts the unitless value, so
+ * the app looked fine there and fell apart on an iPhone - the brightness toggle
+ * in the header came out as a single point, and the same happened to the Sun
+ * and the Moon in both skins.
+ *
+ * The sizes below restate what the components already ask for, this time as
+ * real lengths. A CSS rule outranks a presentation attribute, so an icon that
+ * carries its own class keeps whatever that class says - the Telegram button
+ * sets its own 15/17px, the wordmark its own height - and is not touched here.
+ *
+ * The list mirrors the sizes the components pass today. A new icon at one of
+ * these sizes is covered; a new size has to be added below, or the icon given
+ * a class of its own.
+ */
+svg[width='12'][height='12'] {
+  width: 12px;
+  height: 12px;
+}
+
+svg[width='13'][height='13'] {
+  width: 13px;
+  height: 13px;
+}
+
+svg[width='14'][height='14'] {
+  width: 14px;
+  height: 14px;
+}
+
+svg[width='16'][height='16'] {
+  width: 16px;
+  height: 16px;
+}
+
 .skip-link {
   position: absolute;
   top: -100px;
@@ -369,7 +411,13 @@ button {
 .chat {
   position: relative;
   display: grid;
-  grid-template-rows: 1fr auto auto;
+  /*
+   * Four tracks: the log takes what is left, then the error notice, the field
+   * and the demo switch. The last one is out of flow on a wide screen - the
+   * switch floats there - and an empty `auto` track costs nothing. On a phone
+   * it comes back into flow and lands under the field.
+   */
+  grid-template-rows: 1fr auto auto auto;
   gap: var(--gap-3);
   min-height: 0;
 }
@@ -1060,8 +1108,22 @@ kbd {
   border-color: var(--border-strong);
 }
 
+/*
+ * The panel is 519px tall as drawn. Hanging 92px from the top of a wide screen
+ * that is comfortable, but it has to stay inside the window whatever the window
+ * is. Without a ceiling it ran off the bottom of a short one, and on a phone,
+ * where it used to hang off the bottom edge, the head ended up above the top of
+ * the screen at -44px - visible to nobody and tappable by nobody, so the only
+ * way out of the panel was to reload the page. A ceiling turns that overflow
+ * into a scroll inside the panel.
+ */
 .demo__panel {
   width: 272px;
+  /* `vh` first for browsers without `dvh` (Safari before 15.4). */
+  max-height: calc(100vh - 128px);
+  max-height: calc(100dvh - 128px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -1069,12 +1131,22 @@ kbd {
   box-shadow: var(--shadow-float);
 }
 
+/*
+ * The head travels with the scroll so the close control is in reach no matter
+ * where the panel is scrolled to. The margin becomes padding: the sticky box
+ * then carries its own background down over the content sliding under it, and
+ * the spacing is the same either way.
+ */
 .demo__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-2);
-  margin-bottom: 10px;
+  padding-bottom: 10px;
+  background: var(--surface);
 }
 
 .demo__title {
@@ -1260,16 +1332,36 @@ kbd {
     display: none;
   }
 
-  /* On a phone the panel would cover the conversation, so it drops to the
-     bottom-right corner and opens as a sheet under the header. */
+  /*
+   * On a phone the switch stops floating and becomes the last row of the chat
+   * column, right under the field.
+   *
+   * Floating it was the wide-screen idea - a corner of the page the dialog
+   * never reaches. Down here there is no such corner: measured at 375px the
+   * fixed chip and the field overlapped by 124x11px, and at 360px by 124x17px,
+   * the chip sitting on top of the hint row and the send button. In flow it
+   * cannot cover anything, because the log above it gives up the height
+   * instead. It is held to the same reading column as the field, so the chip
+   * lines up with the field's right edge.
+   */
   .demo {
-    top: auto;
-    right: 12px;
-    bottom: 108px;
+    position: static;
+    width: 100%;
+    max-width: var(--column-width);
+    margin-inline: auto;
   }
 
+  /*
+   * The panel is bounded by the column it now lives in, not by the viewport,
+   * and its ceiling is what is left of the screen once the header and the field
+   * have taken their share - about 250px of the two together with their gaps.
+   * On a 568px screen that leaves the panel 318px and it scrolls inside itself,
+   * with the close button still on screen and still working.
+   */
   .demo__panel {
-    width: min(272px, calc(100vw - 24px));
+    width: min(272px, 100%);
+    max-height: calc(100vh - 250px);
+    max-height: calc(100dvh - 250px);
   }
 
   .chat__log {
