@@ -1,4 +1,4 @@
-import { isProxyConfigured } from '../config.js';
+import { config, isProxyConfigured, isRelayConfigured } from '../config.js';
 import type { ChatErrorCode } from '../types/chat.js';
 
 export type ErrorScope = 'global' | 'model';
@@ -132,14 +132,23 @@ function isEdgeBlock(status: number, body: string): boolean {
  * fix. Without this the reader is left with a 403 that looks like a bad key,
  * and the first thing they check is the one thing that is fine.
  *
- * The two cases are worth separating because the remedy differs: with no proxy
- * configured there is a knob to turn, and with one already in use the exit node
- * itself is blocked and turning it does nothing.
+ * The cases are worth separating because the remedy differs, and the wrong one
+ * costs a round trip. The subtlety is that "a proxy is configured" and "the
+ * request went through a proxy" are different statements: a configured port with
+ * nothing behind it is treated as no proxy at all, and the request goes out
+ * directly. The hint therefore points at the startup line that says which route
+ * was actually taken rather than assuming it from the configuration.
  */
 function blockedHint(): string {
-  return isProxyConfigured()
-    ? 'This address is blocked upstream, and the configured OUTBOUND_PROXY is already in use - so the block follows the proxy exit too. Try another exit node.'
-    : 'This address is blocked upstream; the key is not the problem. Set OUTBOUND_PROXY in .env to a working proxy and restart - see README, "Если openrouter.ai недоступен".';
+  if (isRelayConfigured()) {
+    return "Upstream calls go through the configured relay, so the block is on the relay's own address rather than on this machine.";
+  }
+
+  if (isProxyConfigured()) {
+    return `OUTBOUND_PROXY is set to ${config.outboundProxy}. The startup line beginning "[api] upstream:" says which route was taken: "via proxy" means the block follows that exit and another exit node is needed, while "is not reachable" means the VPN client is not running and the request went out directly.`;
+  }
+
+  return 'This address is blocked upstream; the key is not the problem. Put the local HTTP port of your VPN client into OUTBOUND_PROXY in .env and restart - v2rayN listens on 10809, clash on 7890, sing-box on 2080. See README, "Если openrouter.ai недоступен".';
 }
 
 /** Map an upstream HTTP failure to a typed error we can act on. */
