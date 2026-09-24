@@ -50,11 +50,19 @@ const proxyFromEnv =
  * list and the server rotates through it when a key is rejected or its daily
  * window is spent, which is how the reference implementation stays alive.
  *
- * `OPENROUTER_API_KEY` alone still works and is treated as a list of one.
+ * `OPENROUTER_API_KEY` alone still works, and it is read through the same
+ * splitter as the plural name.
+ *
+ * That last part is deliberate. Two keys pasted into the singular variable -
+ * `OPENROUTER_API_KEY=sk-a, sk-b` - is the obvious thing to do with a variable
+ * that already holds a key, and reading it as one string sent the whole value,
+ * comma and space included, as a single bearer token. OpenRouter answered
+ * `401 User not found`, which reads like "your keys are bad" when both keys were
+ * fine and only the shape of the value was wrong.
  */
 const keyList = list('OPENROUTER_API_KEYS');
-const singleKey = str('OPENROUTER_API_KEY');
-const apiKeys = keyList.length > 0 ? keyList : singleKey ? [singleKey] : [];
+const singleKey = list('OPENROUTER_API_KEY');
+const apiKeys = keyList.length > 0 ? keyList : singleKey;
 
 /** OpenRouter's own address. Anything else means a relay is in front of it. */
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';

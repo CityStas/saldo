@@ -33,6 +33,27 @@ describe('api key rotation', () => {
     expect(keys.currentApiKey()).toBe('solo');
   });
 
+  /*
+   * Two keys pasted into the singular variable is the obvious mistake to make -
+   * it already holds a key, so it looks like the place for another one. Read as
+   * one string, the whole value went out as a bearer token and OpenRouter
+   * answered `401 User not found`, which reads as "both keys are bad" when both
+   * were fine. The space after the comma is here on purpose: that is how it gets
+   * typed, and it must not survive into the key.
+   */
+  it('reads a comma-separated OPENROUTER_API_KEY as a list too', async () => {
+    vi.resetModules();
+    vi.stubEnv('OPENROUTER_API_KEYS', '');
+    vi.stubEnv('OPENROUTER_API_KEY', 'k1, k2');
+
+    const keys = await import('./openrouter.js');
+
+    expect(keys.apiKeyCount()).toBe(2);
+    expect(keys.currentApiKey()).toBe('k1');
+    expect(keys.rotateApiKey()).toBe(true);
+    expect(keys.currentApiKey()).toBe('k2');
+  });
+
   it('walks the list and reports which key is in use', async () => {
     const keys = await loadWithKeys('k1,k2,k3');
 

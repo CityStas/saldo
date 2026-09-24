@@ -1,3 +1,4 @@
+import { isProxyConfigured } from '../config.js';
 import type { ChatErrorCode } from '../types/chat.js';
 
 export type ErrorScope = 'global' | 'model';
@@ -122,6 +123,25 @@ function isEdgeBlock(status: number, body: string): boolean {
   }
 }
 
+/**
+ * What to do about a block, said where the person running the server will read it.
+ *
+ * The block is enforced on the address the request leaves from, which makes it
+ * the one failure here that no key and no model can work around - and the edge's
+ * own body, `Access denied by security policy.`, names neither the cause nor the
+ * fix. Without this the reader is left with a 403 that looks like a bad key,
+ * and the first thing they check is the one thing that is fine.
+ *
+ * The two cases are worth separating because the remedy differs: with no proxy
+ * configured there is a knob to turn, and with one already in use the exit node
+ * itself is blocked and turning it does nothing.
+ */
+function blockedHint(): string {
+  return isProxyConfigured()
+    ? 'This address is blocked upstream, and the configured OUTBOUND_PROXY is already in use - so the block follows the proxy exit too. Try another exit node.'
+    : 'This address is blocked upstream; the key is not the problem. Set OUTBOUND_PROXY in .env to a working proxy and restart - see README, "Если openrouter.ai недоступен".';
+}
+
 /** Map an upstream HTTP failure to a typed error we can act on. */
 export function fromUpstreamStatus(status: number, body: string): AppError {
   const detail = parseUpstream(body);
@@ -129,7 +149,7 @@ export function fromUpstreamStatus(status: number, body: string): AppError {
   if (isEdgeBlock(status, body)) {
     return new AppError(
       'UPSTREAM_BLOCKED',
-      `The request was refused before it reached a model (${status}). ${detail.message}`,
+      `The request was refused before it reached a model (${status}). ${detail.message} ${blockedHint()}`,
       502,
     );
   }
