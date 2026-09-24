@@ -29,11 +29,11 @@ describe('withSystemPrompt', () => {
   it('names the assistant and keeps the domain rules in the prompt', () => {
     expect(SYSTEM_PROMPT).toContain(ASSISTANT_NAME);
     expect(SYSTEM_PROMPT).toContain('входящего НДС');
-    expect(SYSTEM_PROMPT).toContain('САЛЬДО');
+    expect(SYSTEM_PROMPT).toContain('САЛЬТО');
   });
 
   it('uses hyphens only, like the rest of the project', () => {
-    // The persona answers in the voice of САЛЬДО's own copy, and that copy is
+    // The persona answers in the voice of САЛЬТО's own copy, and that copy is
     // written with hyphens. An em dash in an answer would be the one place the
     // chat visibly stops matching the service it belongs to, so the prompt has
     // to ask the model for the same and this test pins the instruction.

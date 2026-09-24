@@ -119,7 +119,7 @@ describe('cannedAnswer', () => {
     expect(cannedAnswer('identity', true)).toBe(IDENTITY_ANSWER);
     expect(cannedAnswer('identity', false)).toBe(IDENTITY_ANSWER);
     expect(IDENTITY_ANSWER).toContain('администратор Амалия');
-    expect(IDENTITY_ANSWER).toContain('САЛЬДО');
+    expect(IDENTITY_ANSWER).toContain('САЛЬТО');
     expect(IDENTITY_ANSWER).toContain('входящего НДС');
   });
 

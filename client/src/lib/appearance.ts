@@ -6,7 +6,7 @@ import type { SkinName, ThemeMode } from '../types/chat';
  * They are independent on purpose. Brightness (`data-mode`) is a property of
  * the palette; appearance (`data-skin`) is a whole design system. That is why
  * they are two attributes on <html> rather than one `theme` string: a person can
- * want the САЛЬДО palette after dark without that also meaning "the other
+ * want the САЛЬТО palette after dark without that also meaning "the other
  * design", and vice versa. Both are applied by the inline script in index.html
  * before the first paint, so neither flashes.
  */
@@ -18,7 +18,7 @@ import type { SkinName, ThemeMode } from '../types/chat';
  *
  * There used to be three palettes on a second axis (`cream | indigo | mint`)
  * with a row of swatches in the header. It was removed: the chat is a client
- * of САЛЬДО, and offering three colourways of someone else's brand made the
+ * of САЛЬТО, and offering three colourways of someone else's brand made the
  * screen look like a theme demo rather than a product. What is left is the one
  * palette the service actually uses, in the two brightnesses the assignment
  * asked for.
@@ -34,7 +34,7 @@ export interface Skin {
  * Two appearances for the same chat.
  *
  * `saldo` is the product: the palette and typography of saldo.chat, which is
- * what a client of САЛЬДО should see. `portfolio` is the same components
+ * what a client of САЛЬТО should see. `portfolio` is the same components
  * dressed in the visual language of a personal portfolio page - near-black
  * paper, hairline rules, Playfair Display headings, wide-tracked monospace
  * labels, square corners, a pale sand accent.
@@ -45,8 +45,8 @@ export interface Skin {
  * React tree branches on the skin - only `data-skin` on <html> changes.
  */
 export const SKINS: Skin[] = [
-  { name: 'saldo', label: 'САЛЬДО Original' },
-  { name: 'portfolio', label: 'САЛЬДО New' },
+  { name: 'saldo', label: 'САЛЬТО Original' },
+  { name: 'portfolio', label: 'САЛЬТО New' },
 ];
 
 export const DEFAULT_SKIN: SkinName = 'saldo';

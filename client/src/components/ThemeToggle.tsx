@@ -10,7 +10,7 @@ interface Props {
  * Light and dark, one button.
  *
  * There used to be a second axis here - three palettes chosen with a row of
- * swatches - and it was removed. The chat is a client of САЛЬДО, and offering
+ * swatches - and it was removed. The chat is a client of САЛЬТО, and offering
  * three colourways of someone else's brand made the header read as a theme
  * demo. What is left is the one palette the service uses, in the two
  * brightnesses the assignment asked for.

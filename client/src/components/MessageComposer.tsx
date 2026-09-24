@@ -1,7 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Square } from 'lucide-react';
-
-const MAX_TEXTAREA_HEIGHT = 200;
 
 interface Props {
   isGenerating: boolean;
@@ -13,14 +11,26 @@ export function MessageComposer({ isGenerating, onSend, onStop }: Props) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Grow with the content instead of showing a scrollbar after two lines.
-  useLayoutEffect(() => {
-    const element = textareaRef.current;
-    if (!element) return;
-
-    element.style.height = 'auto';
-    element.style.height = `${Math.min(element.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
-  }, [value]);
+  /*
+   * The field grows with what is typed, and the browser does the growing:
+   * `field-sizing: content` on `.composer__input` is CSS's own answer to "size
+   * this box to its text", with `max-height` as the ceiling and the field's own
+   * scrollbar past it.
+   *
+   * This used to be a `useLayoutEffect` that read `scrollHeight` and wrote it
+   * back as an inline height, once per mount. A number written once from one
+   * measurement is a number that can be written wrong and stay wrong: a box
+   * stretched by its parent, an extension that touches the field, a font that
+   * arrives after the read - each of them turns that single read into a field
+   * locked at the maximum, and only a reload clears it. That is what a
+   * one-line field that opens 200px tall is. A height the browser derives from
+   * the content every frame cannot get stuck that way, and it costs no
+   * JavaScript at all.
+   *
+   * Where `field-sizing` is not supported yet (Safari, Firefox) the field keeps
+   * the single row `rows={1}` asks for and scrolls its own content. Typing more
+   * than one line still works; it is the box that does not follow.
+   */
 
   useEffect(() => {
     textareaRef.current?.focus();

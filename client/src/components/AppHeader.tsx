@@ -31,7 +31,7 @@ export function AppHeader({
         */}
         {/*
           The wordmark leads to the service it belongs to, the way a logo
-          normally does. The accessible name says where it goes: "Салдо" alone
+          normally does. The accessible name says where it goes: "Салто" alone
           reads as a heading, and a link that only repeats the brand leaves a
           screen reader user guessing whether it is a link at all.
         */}
@@ -40,7 +40,7 @@ export function AppHeader({
           href="https://saldo.chat/"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Салдо: открыть основной сайт"
+          aria-label="Салто: открыть основной сайт"
           title="Открыть saldo.chat"
         >
           <Logo className="header__logo" height={32} />

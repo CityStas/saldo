@@ -965,19 +965,39 @@ button {
   box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card);
 }
 
+/*
+ * The box follows the text, and the browser does the measuring: `field-sizing`
+ * sizes the element to its content, `max-height` is the ceiling, and the field
+ * scrolls inside itself past it. There used to be a `useLayoutEffect` writing an
+ * inline height here from a single read of `scrollHeight` - and one read taken
+ * once per mount is one chance to get it wrong, permanently. Browsers without
+ * `field-sizing` fall back to the single row `rows={1}` asks for.
+ */
 .composer__input {
   width: 100%;
+  field-sizing: content;
   max-height: 200px;
   padding: 9px 0;
   border: 0;
   background: transparent;
   resize: none;
+  overflow-y: auto;
   line-height: 1.5;
   outline: none;
 }
 
 .composer__input::placeholder {
   color: var(--muted);
+  /*
+   * One line, always. With `field-sizing: content` the placeholder is part of
+   * what the box is measured against, and on a 320px screen the sentence wraps
+   * and takes the field to two lines with it - an empty field that opens 66px
+   * tall for no reason the person can see. Held to a single line it ellipsises
+   * instead, and the field stays the height of one row wherever it is.
+   */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .button {
@@ -1453,8 +1473,56 @@ kbd {
     display: none;
   }
 
+  /*
+   * Sixteen pixels, and it is not a taste decision. iOS Safari zooms the page in
+   * when a field whose font-size is below 16px takes focus - this field inherits
+   * the 15px body size - and it does not zoom back out when the field is left.
+   * The page stays scaled and panned, the header half off the top of the screen,
+   * and only a reload brings it back. Sixteen is the threshold, not a
+   * preference, and that is the only reason the size is raised here rather than
+   * everywhere.
+   */
+  .composer__input {
+    font-size: 16px;
+    /*
+     * A shorter ceiling than the wide screen's 200px: here the field shares the
+     * screen with a heading, a lead and the switch below it, and past about four
+     * lines it is the conversation that runs out of room, not the question.
+     */
+    max-height: 116px;
+  }
+
+  /*
+   * The example questions go on a phone. They are white cards with a hairline
+   * border and a rounded corner - the field's own shape - stacked directly above
+   * the field, and the screen reads as five inputs, four of which do nothing
+   * useful when tapped by mistake. What is left is the heading, the lead and the
+   * field, which is the whole of an empty state a phone needs.
+   */
   .empty__suggestions {
-    grid-template-columns: minmax(0, 1fr);
+    display: none;
+  }
+
+  /*
+   * With the examples gone the field closes the lead directly, and the two
+   * margins that used to sit either side of the list would stack into a 44px
+   * hole under the last line of text. The lead's own margin is the gap.
+   */
+  .empty__composer {
+    margin-top: 0;
+  }
+
+  /*
+   * The block is centred as a whole, and the field goes up with it instead of
+   * sitting at the bottom of the column.
+   *
+   * `margin-block: auto` rather than `justify-content: center` on the log: auto
+   * margins take the free space when there is some and collapse to zero when
+   * there is not, so the heading keeps its top on a screen too short for the
+   * block - which is what an iPhone with the keyboard up is.
+   */
+  .empty {
+    margin-block: auto;
   }
 
   .hint:nth-child(2) {

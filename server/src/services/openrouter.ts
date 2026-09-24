@@ -21,7 +21,7 @@ const BASE_URL = config.openrouterBaseUrl;
  */
 const RELAY_TOKEN_HEADER = 'X-Relay-Token';
 
-const APP_TITLE = 'Saldo Chat';
+const APP_TITLE = 'Salto Chat';
 const APP_URL = 'https://github.com/CityStas/saldo';
 
 let cachedDispatcher: Dispatcher | null = null;
