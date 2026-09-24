@@ -6,12 +6,15 @@ dist
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
-.refs/
-openrouter_free_logic/
-.playwright-mcp/
 *.log
+.playwright-mcp/
 
-# Local working notes: the assignment text and my own stack notes. The second
-# file contains a live API key, so it must never be tracked.
-TASK.md
-стек.txt
+# The assistant's working directory. It holds session notes and throwaway
+# probes, so it stays local.
+.workbuddy-ai/
+
+# Wrangler's local state (`worker/.wrangler/`) and the file it reads local
+# secrets from. Both are machine-specific, and `.dev.vars` holds a plaintext
+# copy of RELAY_TOKEN by design - exactly the thing that must never be tracked.
+.wrangler/
+.dev.vars
