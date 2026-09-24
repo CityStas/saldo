@@ -9,6 +9,7 @@ import { MessageComposer } from './components/MessageComposer';
 import { TypingIndicator } from './components/TypingIndicator';
 import { useAnswerMode } from './hooks/useAnswerMode';
 import { useChat } from './hooks/useChat';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import { useSkin } from './hooks/useSkin';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useTheme } from './hooks/useTheme';
@@ -92,6 +93,16 @@ export default function App() {
   // is expected to be.
   const isBlank = visibleMessages.length === 0 && !isGenerating;
 
+  /*
+   * On a phone the empty state is taller than the log, so anything inside it
+   * can end up below the fold - and the field is the one thing that must never
+   * be. Below the same breakpoint the stylesheet switches to the phone layout,
+   * so the field becomes a row of the column there, pinned to the bottom, and
+   * the example questions scroll above it. The breakpoint is the stylesheet's
+   * 680px; the two have to agree.
+   */
+  const narrow = useMediaQuery('(max-width: 680px)');
+
   // `!isBlank` and not `true`: sticking to the bottom of an empty log scrolls
   // the centred empty state up under the header. See the hook for the numbers.
   const { containerRef, isPinned, onScroll, scrollToBottom } = useStickToBottom(
@@ -137,7 +148,10 @@ export default function App() {
           data-blank={isBlank}
         >
           {isBlank ? (
-            <EmptyState onSuggestion={sendMessage} composer={composer} />
+            <EmptyState
+              onSuggestion={sendMessage}
+              composer={narrow ? undefined : composer}
+            />
           ) : (
             <div className="chat__thread">
               {visibleMessages.map((message) => (
@@ -177,7 +191,7 @@ export default function App() {
           />
         ) : null}
 
-        {isBlank ? null : composer}
+        {isBlank && !narrow ? null : composer}
 
         {/*
           The last row of the chat column. On a wide screen the stylesheet pins

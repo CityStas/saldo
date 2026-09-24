@@ -78,45 +78,90 @@ button {
 }
 
 /*
- * Icon sizes, stated in CSS rather than left to the markup.
+ * Icon sizes, stated by the container rather than left to the markup.
  *
  * Lucide draws its icons as inline SVG and sizes them through the `width` and
  * `height` presentation attributes - plain numbers, no unit. Once that SVG is
- * part of an HTML document those attributes are read as CSS declarations, and
- * a bare number is not a length, so the declaration is invalid and gets thrown
- * away. WebKit follows the spec here and the icon is left with no used size at
- * all: it collapses into a dot. Chrome quietly accepts the unitless value, so
- * the app looked fine there and fell apart on an iPhone - the brightness toggle
- * in the header came out as a single point, and the same happened to the Sun
- * and the Moon in both skins.
+ * part of an HTML document those attributes are read as CSS declarations, and a
+ * bare number is not a length, so the declaration is invalid and gets thrown
+ * away. WebKit is strict about this and the icon is left with no used size at
+ * all: on an iPhone the brightness toggle in the header came out as a single
+ * pixel, and so did the Sun, the Moon and the cross in the demo panel.
  *
- * The sizes below restate what the components already ask for, this time as
- * real lengths. A CSS rule outranks a presentation attribute, so an icon that
- * carries its own class keeps whatever that class says - the Telegram button
- * sets its own 15/17px, the wordmark its own height - and is not touched here.
+ * Naming the containers instead of matching the attribute is deliberate. The
+ * one icon in this app that never broke is the Telegram paper plane, and it is
+ * the one icon whose size has always come from a class (`.tg-button__icon`)
+ * rather than from the attribute. Whatever WebKit does with the attribute, a
+ * plain class or descendant rule is what works on the device, so that is what
+ * every icon uses now.
  *
- * The list mirrors the sizes the components pass today. A new icon at one of
- * these sizes is covered; a new size has to be added below, or the icon given
- * a class of its own.
+ * `flex: none` is part of the fix, not decoration: these icons sit in flex
+ * containers, and without it an icon that ends up with no definite size can be
+ * shrunk to nothing by the flex algorithm instead of falling back to a sane
+ * size. The Telegram icon has always carried it.
+ *
+ * The sizes mirror what the components pass to Lucide. A new icon needs a line
+ * here, next to the container it lives in.
  */
-svg[width='12'][height='12'] {
-  width: 12px;
-  height: 12px;
-}
-
-svg[width='13'][height='13'] {
-  width: 13px;
-  height: 13px;
-}
-
-svg[width='14'][height='14'] {
-  width: 14px;
-  height: 14px;
-}
-
-svg[width='16'][height='16'] {
+.icon-button > svg {
   width: 16px;
   height: 16px;
+  flex: none;
+}
+
+.icon-button--small > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.demo__toggle > svg,
+.demo__close > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.notice__icon > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.notice__actions .button > svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.button--send > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.button--stop > svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.to-bottom > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.code__copy > svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.message__copy > svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
 }
 
 .skip-link {
@@ -412,12 +457,12 @@ svg[width='16'][height='16'] {
   position: relative;
   display: grid;
   /*
-   * Four tracks: the log takes what is left, then the error notice, the field
-   * and the demo switch. The last one is out of flow on a wide screen - the
-   * switch floats there - and an empty `auto` track costs nothing. On a phone
-   * it comes back into flow and lands under the field.
+   * Three tracks: the log takes what is left, then the error notice and the
+   * field. On a phone the demo switch joins them as a fourth, and that row is
+   * implicit - an empty `auto` track still costs its gap, and on a wide screen,
+   * where the switch floats, there is nothing to put in it.
    */
-  grid-template-rows: 1fr auto auto auto;
+  grid-template-rows: 1fr auto auto;
   gap: var(--gap-3);
   min-height: 0;
 }
@@ -1377,12 +1422,35 @@ kbd {
   }
 
   /*
-   * On a phone the empty state is tall - four questions in one column plus the
-   * field - so it gets a guaranteed gap under the header. `safe` centring still
-   * does its job when the screen is tall enough for the block to fit.
+   * On a phone the empty state is taller than the log - the heading, the lead
+   * and four questions in one column - so it scrolls, and this is where that
+   * has to be handled carefully.
+   *
+   * `justify-content: safe center` is not honoured here. WebKit drops the
+   * declaration, the block is centred anyway, and a centred block that
+   * overflows loses its top above the scrollport where no amount of scrolling
+   * can bring it back. That is exactly what an iPhone showed: "С чего начать?"
+   * cut off behind the header, and the field pushed out of sight below. Top
+   * alignment cannot lose anything - the heading is always the first thing on
+   * screen and the rest is reachable by scrolling.
+   *
+   * The padding is tightened to buy back part of the height the switch below
+   * takes away.
    */
   .chat__log[data-blank='true'] {
-    padding-top: 26px;
+    justify-content: flex-start;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  /*
+   * The keyboard hints have nothing to say on a touch screen: there is no
+   * Enter, no Shift+Enter and no Escape. They cost about 27px of a phone
+   * screen, which is the difference between the empty state fitting and
+   * needing a scroll.
+   */
+  .composer__hints {
+    display: none;
   }
 
   .empty__suggestions {
