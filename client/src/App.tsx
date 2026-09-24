@@ -9,7 +9,6 @@ import { MessageComposer } from './components/MessageComposer';
 import { TypingIndicator } from './components/TypingIndicator';
 import { useAnswerMode } from './hooks/useAnswerMode';
 import { useChat } from './hooks/useChat';
-import { useMediaQuery } from './hooks/useMediaQuery';
 import { useSkin } from './hooks/useSkin';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useTheme } from './hooks/useTheme';
@@ -94,14 +93,20 @@ export default function App() {
   const isBlank = visibleMessages.length === 0 && !isGenerating;
 
   /*
-   * On a phone the empty state is taller than the log, so anything inside it
-   * can end up below the fold - and the field is the one thing that must never
-   * be. Below the same breakpoint the stylesheet switches to the phone layout,
-   * so the field becomes a row of the column there, pinned to the bottom, and
-   * the example questions scroll above it. The breakpoint is the stylesheet's
-   * 680px; the two have to agree.
+   * The field used to be a row of this column on a phone and a part of the
+   * empty state everywhere else, because the empty state - a heading, a lead
+   * and four example questions - was taller than the log, and anything inside
+   * it could scroll out of reach. That reasoning is gone: the examples are
+   * hidden below the breakpoint, the keyboard hints were already, and the field
+   * no longer grows on its own. What is left is short enough to fit on the
+   * shortest phone, so the field stays where it reads best - directly under the
+   * heading, closing the block - and the breakpoint has nothing left to decide.
+   *
+   * Centring is done by the stylesheet with auto margins rather than by
+   * `justify-content`, which is what keeps it honest when the block does not
+   * fit: auto margins collapse to zero on overflow, so the top of the heading
+   * is never the part that goes missing.
    */
-  const narrow = useMediaQuery('(max-width: 680px)');
 
   // `!isBlank` and not `true`: sticking to the bottom of an empty log scrolls
   // the centred empty state up under the header. See the hook for the numbers.
@@ -148,10 +153,7 @@ export default function App() {
           data-blank={isBlank}
         >
           {isBlank ? (
-            <EmptyState
-              onSuggestion={sendMessage}
-              composer={narrow ? undefined : composer}
-            />
+            <EmptyState onSuggestion={sendMessage} composer={composer} />
           ) : (
             <div className="chat__thread">
               {visibleMessages.map((message) => (
@@ -191,7 +193,7 @@ export default function App() {
           />
         ) : null}
 
-        {isBlank && !narrow ? null : composer}
+        {isBlank ? null : composer}
 
         {/*
           The last row of the chat column. On a wide screen the stylesheet pins
